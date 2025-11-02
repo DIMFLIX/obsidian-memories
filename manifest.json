@@ -1,9 +1,9 @@
 {
-	"id": "obsidian-memories",
-	"name": "Obsidian Memories",
+	"id": "memories",
+	"name": "Memories",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Plugin for Obsidian to display a gallery directly in a note",
+	"description": "Plugin to display a gallery directly in a note.",
 	"author": "DIMFLIX",
 	"authorUrl": "https://github.com/DIMFLIX",
 	"fundingUrl": "https://dimflix.github.io",
