@@ -160,8 +160,8 @@
 
 .lightbox-file-info {
     display: flex;
-    flex-direction: column;
-    align-items: flex-end;
+    align-items: center;
+    justify-content: center;
     gap: 4px;
 }
 
@@ -382,4 +382,312 @@
 .audio-thumb {
     font-size: 24px;
     color: var(--text-muted);
+}
+
+/* Стили для кнопки загрузки */
+.gallery-upload-btn {
+    background: var(--interactive-accent);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: 10px;
+}
+
+.gallery-upload-btn:hover {
+    background: var(--interactive-accent-hover);
+}
+
+/* Стили для формы загрузки */
+.upload-form-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.upload-form {
+    background: var(--background-primary);
+    padding: 20px;
+    border-radius: 8px;
+    min-width: 400px;
+    max-width: 90%;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.upload-path-section {
+    margin-bottom: 15px;
+}
+
+.upload-path-section label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.upload-path-select {
+    width: 100%;
+    padding: 5px;
+    border-radius: 4px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+    color: var(--text-normal);
+}
+
+.upload-drop-area {
+    border: 2px dashed var(--background-modifier-border);
+    border-radius: 8px;
+    padding: 40px 20px;
+    text-align: center;
+    margin-bottom: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.upload-drop-area:hover {
+    border-color: var(--interactive-accent);
+    background: var(--background-modifier-hover);
+}
+
+.upload-drop-area.dragover {
+    border-color: var(--interactive-accent);
+    background: var(--background-modifier-active);
+}
+
+.upload-drop-area.has-files {
+    border-color: var(--interactive-accent);
+    background: var(--background-secondary);
+}
+
+.drop-area-content .drop-icon {
+    font-size: 48px;
+    margin-bottom: 10px;
+}
+
+.drop-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 5px 0;
+}
+
+.upload-button-section {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.upload-cancel-btn,
+.upload-confirm-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.upload-cancel-btn {
+    background: var(--background-modifier-border);
+    color: var(--text-normal);
+}
+
+.upload-confirm-btn {
+    background: var(--interactive-accent);
+    color: white;
+}
+
+.upload-confirm-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.upload-loading {
+    padding: 10px;
+    text-align: center;
+    background: var(--background-modifier-active);
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.upload-file-list {
+    max-height: 200px;
+    overflow-y: auto;
+    margin: 10px 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    padding: 5px;
+    background: var(--background-primary);
+}
+
+.upload-file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    margin: 2px 0;
+    background: var(--background-secondary);
+    border-radius: 3px;
+}
+
+.upload-file-name {
+    font-size: 12px;
+    color: var(--text-normal);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.upload-remove-file {
+    background: var(--background-modifier-error);
+    color: var(--text-error);
+    border: none;
+    border-radius: 3px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 10px;
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
+.upload-remove-file:hover {
+    background: var(--text-error);
+    color: white;
+}
+
+/* Стили для кнопки удаления в лайтбоксе */
+.lightbox-delete-btn {
+    background: var(--background-modifier-error);
+    color: var(--text-error);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+    white-space: nowrap;
+}
+
+.lightbox-delete-btn:hover {
+    background: var(--text-error);
+    color: white;
+}
+
+/* Стили для контейнера списка файлов в форме загрузки */
+.upload-file-list-container {
+    margin-top: 15px;
+    max-height: 300px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.upload-file-list-title {
+    font-size: 14px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: var(--text-normal);
+}
+
+.upload-file-list {
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    padding: 5px;
+    background: var(--background-primary);
+}
+
+.upload-file-item {
+    display: flex;
+    align-items: center;
+    padding: 8px;
+    margin: 2px 0;
+    background: var(--background-secondary);
+    border-radius: 3px;
+    gap: 8px;
+}
+
+.upload-file-icon {
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.upload-file-name {
+    font-size: 12px;
+    color: var(--text-normal);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.upload-file-size {
+    font-size: 11px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.upload-remove-file {
+    background: var(--background-modifier-error);
+    color: var(--text-error);
+    border: none;
+    border-radius: 3px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+.upload-remove-file:hover {
+    background: var(--text-error);
+    color: white;
+}
+
+/* Стили для скроллбара */
+.upload-file-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.upload-file-list::-webkit-scrollbar-track {
+    background: var(--background-secondary);
+    border-radius: 3px;
+}
+
+.upload-file-list::-webkit-scrollbar-thumb {
+    background: var(--background-modifier-border);
+    border-radius: 3px;
+}
+
+.upload-file-list::-webkit-scrollbar-thumb:hover {
+    background: var(--interactive-accent);
+}
+
+/* Индикатор обновления */
+.gallery-refreshing {
+    position: relative;
+    opacity: 0.7;
+}
+
+.gallery-refreshing::after {
+    content: "🔄";
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 16px;
+    z-index: 10;
 }

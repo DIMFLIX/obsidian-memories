@@ -66,7 +66,7 @@ class MediaGalleryPlugin extends Plugin {
             enableLazyLoad: true,
             gridSize: 200,
             displayType: 'full',
-            limit: 50,
+            limit: 50, // значение по умолчанию для full
             batchSize: 10,
             preloadCount: 3
         };
@@ -95,6 +95,11 @@ class MediaGalleryPlugin extends Plugin {
         
         if (config.paths.length === 0) {
             config.paths = ['./'];
+        }
+        
+        // Устанавливаем limit: 9 по умолчанию для compact, если limit не указан явно
+        if (config.displayType === 'compact' && !lines.some(line => line.trim().startsWith('limit:'))) {
+            config.limit = 9;
         }
         
         return config;
@@ -255,7 +260,12 @@ class MediaGalleryPlugin extends Plugin {
 
     async createGallery(el, config, ctx) {
         el.empty();
+        el.ctx = ctx;
         
+        // Очищаем кэш миниатюр при создании новой галереи
+        this.thumbnailCache.clear();
+        this.pendingRequests.clear();
+
         const loadingIndicator = el.createEl('div', { 
             cls: 'gallery-loading',
             text: 'Loading gallery...' 
@@ -317,7 +327,9 @@ class MediaGalleryPlugin extends Plugin {
 
     async renderGallery(el, files, config, signal) {
         const galleryContainer = el.createEl('div', { cls: 'media-gallery-container' });
-        
+        galleryContainer.ctx = el.ctx;
+        galleryContainer._config = config;
+
         const infoBar = galleryContainer.createEl('div', { cls: 'gallery-info-bar' });
         const fileCountText = config.displayType === 'compact' ? 
             `${files.length} files found (showing first ${config.limit})` : 
@@ -333,6 +345,7 @@ class MediaGalleryPlugin extends Plugin {
             files.slice(0, config.limit) : 
             files;
         
+        this.createUploadButton(infoBar, config, filesToDisplay, galleryContainer);
         await this.renderBatchItems(grid, filesToDisplay, config, signal, 0);
     }
 
@@ -438,8 +451,13 @@ class MediaGalleryPlugin extends Plugin {
         });
         
         requestIdleCallback(() => {
-            img.addEventListener('click', () => {
-                openMediaLightbox(this.app, allMediaFiles || [file], index || 0);
+            const mediaElement = img; // или container для видео/аудио
+            mediaElement.addEventListener('click', () => {
+                const galleryContainer = element.closest('.media-gallery-container');
+                openMediaLightbox(this.app, allMediaFiles || [file], index || 0, () => {
+                    // Этот callback будет вызван после удаления файла
+                    this.refreshCurrentGallery(galleryContainer);
+                }, galleryContainer);
             });
         });
     }
@@ -481,8 +499,13 @@ class MediaGalleryPlugin extends Plugin {
         playIcon.innerHTML = '▶';
         
         requestIdleCallback(() => {
-            container.addEventListener('click', () => {
-                openMediaLightbox(this.app, allMediaFiles || [file], index || 0);
+            const mediaElement = img; // или container для видео/аудио
+            mediaElement.addEventListener('click', () => {
+                const galleryContainer = element.closest('.media-gallery-container');
+                openMediaLightbox(this.app, allMediaFiles || [file], index || 0, () => {
+                    // Этот callback будет вызван после удаления файла
+                    this.refreshCurrentGallery(galleryContainer);
+                }, galleryContainer);
             });
         });
     }
@@ -496,10 +519,48 @@ class MediaGalleryPlugin extends Plugin {
         fileName.textContent = file.name;
         
         requestIdleCallback(() => {
-            container.addEventListener('click', () => {
-                openMediaLightbox(this.app, allMediaFiles || [file], index || 0);
+            const mediaElement = img; // или container для видео/аудио
+            mediaElement.addEventListener('click', () => {
+                const galleryContainer = element.closest('.media-gallery-container');
+                openMediaLightbox(this.app, allMediaFiles || [file], index || 0, () => {
+                    // Этот callback будет вызван после удаления файла
+                    this.refreshCurrentGallery(galleryContainer);
+                }, galleryContainer);
             });
         });
+    }
+
+    async refreshCurrentGallery(galleryContainer) {
+        if (!galleryContainer) return;
+        
+        try {
+            const parentEl = galleryContainer.parentElement;
+            const config = galleryContainer._config;
+            const ctx = galleryContainer.ctx;
+            
+            if (parentEl && config && ctx) {
+                // Добавляем индикатор обновления
+                galleryContainer.classList.add('gallery-refreshing');
+                
+                // Сохраняем позицию прокрутки
+                const scrollPos = window.scrollY;
+                
+                // Очищаем и пересоздаем галерею с новыми данными
+                parentEl.empty();
+                await this.createGallery(parentEl, config, ctx);
+                
+                // Восстанавливаем позицию прокрутки
+                window.scrollTo(0, scrollPos);
+                
+                // Убираем индикатор
+                galleryContainer.classList.remove('gallery-refreshing');
+            }
+        } catch (error) {
+            console.error('Error refreshing gallery:', error);
+            if (galleryContainer) {
+                galleryContainer.classList.remove('gallery-refreshing');
+            }
+        }
     }
 
     showErrorState(element, filename) {
@@ -592,6 +653,325 @@ class MediaGalleryPlugin extends Plugin {
         return array;
     }
 
+    createUploadButton(infoBar, config, files, galleryContainer) {
+        const uploadBtn = infoBar.createEl('button', {
+            text: '📁 Upload Media',
+            cls: 'gallery-upload-btn'
+        });
+        
+        uploadBtn.addEventListener('click', () => {
+            this.showUploadForm(config, files, galleryContainer);
+        });
+    }
+
+    showUploadForm(config, files, galleryContainer) {
+        // Создание модального окна для загрузки
+        const overlay = document.createElement('div');
+        overlay.className = 'upload-form-overlay';
+        
+        const form = document.createElement('div');
+        form.className = 'upload-form';
+        
+        // Заголовок
+        const title = form.createEl('h3');
+        title.textContent = 'Upload Media Files';
+        
+        // Выбор пути
+        const pathSection = form.createEl('div');
+        pathSection.className = 'upload-path-section';
+        pathSection.createEl('label', { text: 'Destination Folder:' });
+        
+        const pathSelect = pathSection.createEl('select');
+        pathSelect.className = 'upload-path-select';
+        
+        config.paths.forEach(path => {
+            const option = pathSelect.createEl('option');
+            option.value = path;
+            option.textContent = path;
+        });
+        
+        // Область для загрузки
+        const dropArea = form.createEl('div');
+        dropArea.className = 'upload-drop-area';
+        dropArea.innerHTML = `
+            <div class="drop-area-content">
+                <div class="drop-icon">📁</div>
+                <p>Drag and drop files here or click to browse</p>
+                <p class="drop-hint">Supports: Images, Videos, Audio</p>
+                <p class="drop-hint">Or press Ctrl+V to paste from clipboard</p>
+            </div>
+        `;
+        
+        // Кнопки
+        const buttonSection = form.createEl('div');
+        buttonSection.className = 'upload-button-section';
+        
+        const cancelBtn = buttonSection.createEl('button', {
+            text: 'Cancel',
+            cls: 'upload-cancel-btn'
+        });
+        
+        const uploadBtn = buttonSection.createEl('button', {
+            text: 'Upload Files',
+            cls: 'upload-confirm-btn'
+        });
+        uploadBtn.disabled = true;
+        
+        form.appendChild(pathSection);
+        form.appendChild(dropArea);
+        form.appendChild(buttonSection);
+        overlay.appendChild(form);
+        document.body.appendChild(overlay);
+        
+        // Обработчики событий
+        this.setupUploadHandlers(form, dropArea, pathSelect, uploadBtn, cancelBtn, overlay, config, galleryContainer);
+    }
+
+    setupUploadHandlers(form, dropArea, pathSelect, uploadBtn, cancelBtn, overlay, config, galleryContainer) {
+        let selectedFiles = [];
+        
+        // Обработчик выбора файлов через клик
+        dropArea.addEventListener('click', () => {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.multiple = true;
+            fileInput.accept = 'image/*,video/*,audio/*';
+            fileInput.addEventListener('change', (e) => {
+                const newFiles = Array.from(e.target.files);
+                selectedFiles = [...selectedFiles, ...newFiles];
+                this.updateDropArea(dropArea, selectedFiles);
+                this.updateFileList(form, selectedFiles); // Обновляем список файлов
+                uploadBtn.disabled = selectedFiles.length === 0;
+            });
+            fileInput.click();
+        });
+        
+        // Обработчик drag and drop
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.classList.add('dragover');
+        });
+        
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.classList.remove('dragover');
+        });
+        
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('dragover');
+            const newFiles = Array.from(e.dataTransfer.files);
+            selectedFiles = [...selectedFiles, ...newFiles];
+            this.updateDropArea(dropArea, selectedFiles);
+            this.updateFileList(form, selectedFiles); // Обновляем список файлов
+            uploadBtn.disabled = selectedFiles.length === 0;
+        });
+        
+        // Обработчик вставки (Ctrl+V)
+        const pasteHandler = (e) => {
+            if (e.clipboardData && e.clipboardData.files.length > 0) {
+                const newFiles = Array.from(e.clipboardData.files);
+                selectedFiles = [...selectedFiles, ...newFiles];
+                this.updateDropArea(dropArea, selectedFiles);
+                this.updateFileList(form, selectedFiles); // Обновляем список файлов
+                uploadBtn.disabled = selectedFiles.length === 0;
+                e.preventDefault();
+            }
+        };
+        
+        document.addEventListener('paste', pasteHandler);
+        
+        // Кнопка отмены
+        cancelBtn.addEventListener('click', () => {
+            document.removeEventListener('paste', pasteHandler);
+            overlay.remove();
+        });
+        
+        // Кнопка загрузки
+        uploadBtn.addEventListener('click', async () => {
+            if (selectedFiles.length > 0) {
+                await this.handleFileUpload(selectedFiles, pathSelect.value, config, galleryContainer);
+                document.removeEventListener('paste', pasteHandler);
+                overlay.remove();
+            }
+        });
+        
+        // Закрытие по клику вне формы
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                document.removeEventListener('paste', pasteHandler);
+                overlay.remove();
+            }
+        });
+
+        // Инициализируем список файлов при открытии формы
+        this.updateFileList(form, selectedFiles);
+    }
+
+    updateDropArea(dropArea, files) {
+        dropArea.innerHTML = '';
+        
+        const content = dropArea.createEl('div');
+        content.className = 'drop-area-content';
+        
+        if (files.length > 0) {
+            const icon = content.createEl('div');
+            icon.className = 'drop-icon';
+            icon.textContent = '✅';
+            
+            const text = content.createEl('p');
+            text.textContent = `${files.length} file(s) selected`;
+            
+            const hint = content.createEl('p');
+            hint.className = 'drop-hint';
+            hint.textContent = 'Click to select more files or drag and drop additional files';
+            
+        } else {
+            const icon = content.createEl('div');
+            icon.className = 'drop-icon';
+            icon.textContent = '📁';
+            
+            const text = content.createEl('p');
+            text.textContent = 'Drag and drop files here or click to browse';
+            
+            const hint = content.createEl('p');
+            hint.className = 'drop-hint';
+            hint.textContent = 'Supports: Images, Videos, Audio';
+            
+            const hint2 = content.createEl('p');
+            hint2.className = 'drop-hint';
+            hint2.textContent = 'Or press Ctrl+V to paste from clipboard';
+        }
+        
+        if (files.length > 0) {
+            dropArea.classList.add('has-files');
+            
+            // Создаем контейнер для списка файлов ПОД областью загрузки
+            const fileListContainer = dropArea.parentElement.querySelector('.upload-file-list-container');
+            if (!fileListContainer) {
+                const newFileListContainer = document.createElement('div');
+                newFileListContainer.className = 'upload-file-list-container';
+                dropArea.parentElement.insertBefore(newFileListContainer, dropArea.nextSibling);
+            }
+            
+            this.updateFileList(dropArea.parentElement, files);
+        } else {
+            dropArea.classList.remove('has-files');
+            // Удаляем контейнер списка файлов, если нет файлов
+            const fileListContainer = dropArea.parentElement.querySelector('.upload-file-list-container');
+            if (fileListContainer) {
+                fileListContainer.remove();
+            }
+        }
+    }
+
+    updateFileList(container, files) {
+        let fileListContainer = container.querySelector('.upload-file-list-container');
+        if (!fileListContainer) {
+            fileListContainer = document.createElement('div');
+            fileListContainer.className = 'upload-file-list-container';
+            const dropArea = container.querySelector('.upload-drop-area');
+            container.insertBefore(fileListContainer, dropArea.nextSibling);
+        }
+        
+        fileListContainer.innerHTML = '';
+        
+        const title = fileListContainer.createEl('div');
+        title.className = 'upload-file-list-title';
+        title.textContent = 'Selected Files:';
+        
+        const fileList = fileListContainer.createEl('div');
+        fileList.className = 'upload-file-list';
+        
+        files.forEach((file, index) => {
+            const fileItem = fileList.createEl('div');
+            fileItem.className = 'upload-file-item';
+            
+            const fileIcon = fileItem.createEl('span');
+            fileIcon.className = 'upload-file-icon';
+            fileIcon.textContent = this.getFileTypeIcon(file.name);
+            
+            const fileName = fileItem.createEl('span');
+            fileName.textContent = file.name;
+            fileName.className = 'upload-file-name';
+            
+            const fileSize = fileItem.createEl('span');
+            fileSize.className = 'upload-file-size';
+            fileSize.textContent = this.formatFileSize(file.size);
+            
+            const removeBtn = fileItem.createEl('button');
+            removeBtn.textContent = '✕';
+            removeBtn.className = 'upload-remove-file';
+            removeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                files.splice(index, 1);
+                this.updateDropArea(container.querySelector('.upload-drop-area'), files);
+            });
+        });
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    async handleFileUpload(files, targetPath, config, galleryContainer) {
+        const loadingIndicator = galleryContainer.createEl('div', {
+            cls: 'upload-loading',
+            text: `Uploading ${files.length} file(s)...`
+        });
+        
+        try {
+            for (const file of files) {
+                await this.saveFileToVault(file, targetPath);
+            }
+            
+            loadingIndicator.remove();
+            
+            // Обновляем галерею
+            await this.refreshGallery(galleryContainer, config);
+            
+        } catch (error) {
+            loadingIndicator.remove();
+            console.error('Upload error:', error);
+            // Показать ошибку
+        }
+    }
+
+    async saveFileToVault(file, targetPath) {
+        const arrayBuffer = await file.arrayBuffer();
+        const fileName = this.getUniqueFileName(targetPath, file.name);
+        const fullPath = `${targetPath}/${fileName}`;
+        
+        await this.app.vault.createBinary(fullPath, arrayBuffer);
+    }
+
+    getUniqueFileName(folderPath, fileName) {
+        const fileExtension = fileName.split('.').pop();
+        const baseName = fileName.substring(0, fileName.length - fileExtension.length - 1);
+        
+        let newName = fileName;
+        let counter = 1;
+        
+        // Проверяем существование файла и добавляем суффикс если нужно
+        while (this.app.vault.getAbstractFileByPath(`${folderPath}/${newName}`)) {
+            newName = `${baseName}_${counter}.${fileExtension}`;
+            counter++;
+        }
+        
+        return newName;
+    }
+
+    async refreshGallery(container, config) {
+        const parentEl = container.parentElement;
+        const ctx = parentEl.ctx;
+        
+        parentEl.empty();
+        await this.createGallery(parentEl, config, ctx);
+    }
+
     onunload() {
         const styles = document.getElementById('media-gallery-styles');
         if (styles) styles.remove();
@@ -615,7 +995,92 @@ class MediaGalleryPlugin extends Plugin {
     }
 }
 
-function openMediaLightbox(app, mediaFiles, startIndex) {
+function deleteCurrentFile(state) {
+    const currentFile = state.mediaFiles[state.currentIndex];
+    if (!currentFile) return;
+    
+    if (confirm(`Are you sure you want to delete "${currentFile.name}"?`)) {
+        try {
+            // Удаляем файл из хранилища Obsidian
+            state.app.vault.delete(currentFile);
+            
+            // Удаляем файл из списка
+            state.mediaFiles.splice(state.currentIndex, 1);
+            
+            if (state.mediaFiles.length === 0) {
+                closeLightbox(state);
+                new Notice('File deleted. Gallery is now empty.');
+            } else {
+                // Переходим к следующему или предыдущему файлу
+                state.currentIndex = Math.min(state.currentIndex, state.mediaFiles.length - 1);
+                updateMedia(state, state.fileLink, state.fileMeta);
+                updateThumbnails(state);
+                new Notice('File deleted successfully.');
+            }
+            
+            // ВСЕГДА обновляем родительскую галерею после удаления
+            if (state.galleryContainer && state.onFileDeleted) {
+                // Добавляем небольшую задержку для гарантии обновления
+                setTimeout(() => {
+                    state.onFileDeleted();
+                }, 100);
+            }
+            
+        } catch (error) {
+            console.error('Error deleting file:', error);
+            new Notice('Error deleting file: ' + error.message);
+        }
+    }
+}
+
+function updateThumbnails(state) {
+    const thumbContainer = document.getElementById('lightbox-thumbnails');
+    if (!thumbContainer) return;
+    
+    thumbContainer.innerHTML = '';
+    
+    const maxVisibleThumbs = Math.min(state.mediaFiles.length, 20);
+    const startThumb = Math.max(0, state.currentIndex - Math.floor(maxVisibleThumbs / 2));
+    const endThumb = Math.min(state.mediaFiles.length, startThumb + maxVisibleThumbs);
+    
+    for (let i = startThumb; i < endThumb; i++) {
+        const file = state.mediaFiles[i];
+        const thumb = document.createElement('div');
+        thumb.className = 'lightbox-thumb';
+        thumb.dataset.index = i;
+        
+        const resourcePath = state.app.vault.getResourcePath(file);
+        
+        if (isImage(file.name)) {
+            const img = document.createElement('img');
+            img.src = resourcePath;
+            img.alt = file.name;
+            thumb.appendChild(img);
+        } else if (isVideo(file.name)) {
+            const video = document.createElement('video');
+            video.src = resourcePath;
+            video.muted = true;
+            video.currentTime = 1;
+            thumb.appendChild(video);
+        } else if (isAudio(file.name)) {
+            const audioThumb = document.createElement('div');
+            audioThumb.className = 'audio-thumb';
+            audioThumb.textContent = '🎵';
+            thumb.appendChild(audioThumb);
+        }
+        
+        thumb.addEventListener('click', () => {
+            state.currentIndex = i;
+            state.randomMode = false;
+            updateRandomButton(state, state.randomBtn);
+            updateMedia(state, state.fileLink, state.fileMeta);
+        });
+        
+        thumbContainer.appendChild(thumb);
+    }
+}
+
+function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryContainer) {
     const existing = document.getElementById('media-lightbox-overlay');
     if (existing) existing.remove();
 
@@ -625,7 +1090,9 @@ function openMediaLightbox(app, mediaFiles, startIndex) {
         mediaFiles: mediaFiles,
         app: app,
         slideshowInterval: null,
-        slideshowActive: false
+        slideshowActive: false,
+        onFileDeleted: onFileDeleted,
+        galleryContainer: galleryContainer
     };
 
     const overlay = document.createElement('div');
@@ -667,6 +1134,11 @@ function openMediaLightbox(app, mediaFiles, startIndex) {
     const rightControls = document.createElement('div');
     rightControls.className = 'lightbox-controls-right';
 
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'lightbox-delete-btn';
+    deleteBtn.textContent = '🗑️ Delete';
+    deleteBtn.addEventListener('click', () => deleteCurrentFile(state));
+
     const fileInfo = document.createElement('div');
     fileInfo.className = 'lightbox-file-info';
     
@@ -683,9 +1155,9 @@ function openMediaLightbox(app, mediaFiles, startIndex) {
     fileMeta.className = 'lightbox-file-meta';
     updateFileMeta(fileMeta, mediaFiles[startIndex]);
 
-    fileInfo.appendChild(fileLink);
     fileInfo.appendChild(fileMeta);
-
+    fileInfo.appendChild(fileLink);
+    
     const infoDiv = document.createElement('div');
     infoDiv.className = 'lightbox-close-box';
     infoDiv.addEventListener('click', () => closeLightbox(state));
@@ -696,6 +1168,7 @@ function openMediaLightbox(app, mediaFiles, startIndex) {
     closeBtn.addEventListener('click', () => closeLightbox(state));
 
     rightControls.appendChild(fileInfo);
+    rightControls.appendChild(deleteBtn);
     infoDiv.appendChild(closeBtn);
     rightControls.appendChild(infoDiv);
 
@@ -833,6 +1306,14 @@ function closeLightbox(state) {
     if (overlay) {
         overlay.dispatchEvent(new Event('cleanup'));
         overlay.remove();
+    }
+    
+    // Принудительно обновляем галерею при закрытии лайтбокса
+    // на случай, если были какие-то изменения
+    if (state && state.galleryContainer && state.onFileDeleted) {
+        setTimeout(() => {
+            state.onFileDeleted();
+        }, 100);
     }
 }
 
