@@ -1,261 +1,209 @@
 const { Plugin } = require('obsidian');
 
+class LRUCache {
+    constructor(maxSize = 100) {
+        this.maxSize = maxSize;
+        this.cache = new Map();
+    }
+
+    get(key) {
+        if (!this.cache.has(key)) return undefined;
+        const value = this.cache.get(key);
+        this.cache.delete(key);
+        this.cache.set(key, value);
+        return value;
+    }
+
+    set(key, value) {
+        if (this.cache.has(key)) {
+            this.cache.delete(key);
+        } else if (this.cache.size >= this.maxSize) {
+            const firstKey = this.cache.keys().next().value;
+            this.cache.delete(firstKey);
+        }
+        this.cache.set(key, value);
+    }
+
+    clear() {
+        this.cache.clear();
+    }
+}
+
 class MediaGalleryPlugin extends Plugin {
     constructor(app, manifest) {
         super(app, manifest);
-        this.thumbnailCache = new Map();
+        this.thumbnailCache = new LRUCache(200);
         this.intersectionObserver = null;
+        this.pendingRequests = new Map();
+        this.workerPool = [];
+        this.maxWorkers = 4;
     }
 
     async onload() {
+        this.initWorkerPool();
+
         this.processor = this.registerMarkdownCodeBlockProcessor('memories', async (source, el, ctx) => {
-            const lines = source.trim().split('\n');
-            
-            // Parse options
-            let paths = [];
-            let sortOrder = 'date-desc';
-            let enableLazyLoad = true;
-            let gridSize = 200;
-            let displayType = 'full'; // default to full
-            let limit = 3; // default limit for compact mode
-            
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (line.startsWith('paths:')) {
-                    const pathsStr = line.substring(6).trim();
-                    paths = pathsStr.split(',').map(p => p.trim());
-                } else if (line.startsWith('sort:')) {
-                    sortOrder = line.substring(5).trim();
-                } else if (line.startsWith('lazy:')) {
-                    enableLazyLoad = line.substring(5).trim() === 'true';
-                } else if (line.startsWith('size:')) {
-                    gridSize = parseInt(line.substring(5).trim()) || 200;
-                } else if (line.startsWith('type:')) {
-                    displayType = line.substring(5).trim();
-                } else if (line.startsWith('limit:')) {
-                    limit = parseInt(line.substring(6).trim()) || 3;
-                } else if (line && !line.includes(':')) {
-                    paths = [line];
-                }
+            try {
+                const config = this.parseConfig(source);
+                await this.createGallery(el, config, ctx);
+            } catch (error) {
+                console.error('Media Gallery Error:', error);
+                el.createEl('div', {
+                    text: 'Error loading gallery',
+                    cls: 'gallery-error'
+                });
             }
-            
-            // Default to current folder if no paths specified
-            if (paths.length === 0) {
-                paths = ['./'];
-            }
-            
-            await this.createGallery(el, paths, sortOrder, ctx, enableLazyLoad, gridSize, displayType, limit);
         });
         
-        // Initialize intersection observer for lazy loading
         this.initIntersectionObserver();
     }
 
-    onunload() {
-        const styles = document.getElementById('media-gallery-styles');
-        if (styles) styles.remove();
-        const lightboxStyles = document.getElementById('media-lightbox-styles');
-        if (lightboxStyles) lightboxStyles.remove();
+    parseConfig(source) {
+        const lines = source.trim().split('\n');
+        const config = {
+            paths: [],
+            sortOrder: 'date-desc',
+            enableLazyLoad: true,
+            gridSize: 200,
+            displayType: 'full',
+            limit: 50,
+            batchSize: 10,
+            preloadCount: 3
+        };
         
-        // Remove any open lightbox
-        const lightbox = document.getElementById('media-lightbox-overlay');
-        if (lightbox) lightbox.remove();
-        
-        // Cleanup intersection observer
-        if (this.intersectionObserver) {
-            this.intersectionObserver.disconnect();
+        for (let line of lines) {
+            line = line.trim();
+            if (line.startsWith('paths:')) {
+                const pathsStr = line.substring(6).trim();
+                config.paths = pathsStr.split(',').map(p => p.trim());
+            } else if (line.startsWith('sort:')) {
+                config.sortOrder = line.substring(5).trim();
+            } else if (line.startsWith('lazy:')) {
+                config.enableLazyLoad = line.substring(5).trim() === 'true';
+            } else if (line.startsWith('size:')) {
+                config.gridSize = parseInt(line.substring(5).trim()) || 200;
+            } else if (line.startsWith('type:')) {
+                config.displayType = line.substring(5).trim();
+            } else if (line.startsWith('limit:')) {
+                config.limit = parseInt(line.substring(6).trim()) || 50;
+            } else if (line.startsWith('batch:')) {
+                config.batchSize = parseInt(line.substring(6).trim()) || 10;
+            } else if (line && !line.includes(':')) {
+                config.paths = [line];
+            }
         }
         
-        // Clear thumbnail cache
-        this.thumbnailCache.clear();
-    }
-
-    initIntersectionObserver() {
-        this.intersectionObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    this.loadMediaElement(entry.target);
-                    this.intersectionObserver.unobserve(entry.target);
-                }
-            });
-        }, {
-            rootMargin: '50px'
-        });
-    }
-
-    async createGallery(el, paths, sortOrder, ctx, enableLazyLoad, gridSize, displayType, limit) {
-        el.empty();
-        let allMediaFiles = [];
+        if (config.paths.length === 0) {
+            config.paths = ['./'];
+        }
         
-        // Handle "./" to get all folders from root
-        if (paths.length === 1 && paths[0] === './') {
-            const rootFolder = this.app.vault.getRoot();
-            allMediaFiles = this.getAllMediaFromRoot(rootFolder);
-        } else {
-            // Get media from specified paths
-            for (const folderPath of paths) {
-                const folder = this.app.vault.getAbstractFileByPath(folderPath);
-                if (!folder) {
-                    el.createEl('div', {
-                        text: `Folder not found: ${folderPath}`,
-                        cls: 'gallery-error'
+        return config;
+    }
+
+    initWorkerPool() {
+        for (let i = 0; i < this.maxWorkers; i++) {
+            const worker = this.createThumbnailWorker();
+            if (worker) {
+                this.workerPool.push({
+                    worker,
+                    busy: false
+                });
+            }
+        }
+    }
+
+    createThumbnailWorker() {
+        if (typeof Worker === 'undefined') return null;
+        
+        const workerCode = `
+            self.addEventListener('message', async (e) => {
+                const { id, videoPath, timestamp } = e.data;
+                try {
+                    const response = await fetch(videoPath);
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    
+                    const video = document.createElement('video');
+                    video.crossOrigin = 'anonymous';
+                    video.muted = true;
+                    video.src = url;
+                    video.currentTime = timestamp;
+                    
+                    await new Promise((resolve, reject) => {
+                        video.onloadeddata = resolve;
+                        video.onerror = reject;
+                        setTimeout(resolve, 1000);
                     });
-                    continue;
-                }
-                
-                if (folder.children !== undefined) {
-                    const mediaFiles = this.getMediaFiles(folder);
-                    allMediaFiles.push(...mediaFiles);
-                }
-            }
-        }
-        
-        // Sort files
-        allMediaFiles = this.sortFiles(allMediaFiles, sortOrder);
-        
-        if (allMediaFiles.length === 0) {
-            el.createEl('div', {
-                text: 'No media files found',
-                cls: 'gallery-empty'
-            });
-            return;
-        }
-        
-        // Create gallery container
-        const galleryContainer = el.createEl('div', { cls: 'media-gallery-container' });
-        
-        // Add info bar
-        const infoBar = galleryContainer.createEl('div', { cls: 'gallery-info-bar' });
-        const fileCountText = displayType === 'compact' ? 
-            `${allMediaFiles.length} files found (showing first ${limit})` : 
-            `${allMediaFiles.length} files found`;
-        infoBar.createEl('span', { text: fileCountText });
-        
-        // Create gallery grid
-        const grid = galleryContainer.createEl('div', { 
-            cls: 'media-gallery-grid',
-            attr: { style: `grid-template-columns: repeat(auto-fill, minmax(${gridSize}px, 1fr));` }
-        });
-        
-        // Determine which files to display
-        const filesToDisplay = displayType === 'compact' ? 
-            allMediaFiles.slice(0, limit) : 
-            allMediaFiles;
-        
-        // Create items with lazy loading support
-        filesToDisplay.forEach((file, index) => {
-            const item = grid.createEl('div', { cls: 'gallery-item' });
-            
-            if (enableLazyLoad) {
-                item.dataset.file = JSON.stringify({
-                    name: file.name,
-                    path: file.path,
-                    index: index,
-                    allFiles: allMediaFiles.map(f => ({ name: f.name, path: f.path }))
-                });
-                item.classList.add('lazy-load');
-                this.intersectionObserver.observe(item);
-                
-                // Add placeholder
-                const placeholder = item.createEl('div', { cls: 'gallery-placeholder' });
-                placeholder.createEl('span', { text: this.getFileTypeIcon(file.name) });
-            } else {
-                this.loadMediaElement(item, file, index, allMediaFiles);
-            }
-        });
-        
-        // Add CSS
-        this.addStyles();
-    }
-
-    async loadMediaElement(element, file = null, index = null, allMediaFiles = null) {
-        if (!file && element.dataset.file) {
-            const fileData = JSON.parse(element.dataset.file);
-            file = this.app.vault.getAbstractFileByPath(fileData.path);
-            index = fileData.index;
-            // Get all media files for lightbox from dataset if available
-            if (fileData.allFiles) {
-                allMediaFiles = fileData.allFiles.map(fileInfo => 
-                    this.app.vault.getAbstractFileByPath(fileInfo.path)
-                ).filter(Boolean);
-            } else {
-                // Fallback: get all media files from container
-                const container = element.closest('.media-gallery-container');
-                allMediaFiles = Array.from(container.querySelectorAll('.gallery-item')).map(item => {
-                    const data = JSON.parse(item.dataset.file || '{}');
-                    return this.app.vault.getAbstractFileByPath(data.path);
-                }).filter(Boolean);
-            }
-        }
-        
-        if (!file) return;
-        
-        // Remove placeholder
-        element.innerHTML = '';
-        element.classList.remove('lazy-load');
-        
-        const resourcePath = this.app.vault.getResourcePath(file);
-        
-        if (this.isImage(file.name)) {
-            const img = element.createEl('img', {
-                attr: {
-                    src: resourcePath,
-                    alt: file.name,
-                    loading: 'lazy'
+                    
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+                    
+                    const thumbnail = canvas.toDataURL('image/jpeg', 0.8);
+                    URL.revokeObjectURL(url);
+                    
+                    self.postMessage({ id, thumbnail });
+                } catch (error) {
+                    self.postMessage({ id, error: error.message });
                 }
             });
-            
-            img.addEventListener('click', () => {
-                openMediaLightbox(this.app, allMediaFiles || [file], index || 0);
-            });
-            
-        } else if (this.isVideo(file.name)) {
-            const thumbnail = await this.getVideoThumbnail(file, resourcePath);
-            
-            const container = element.createEl('div', { cls: 'video-thumbnail-container' });
-            
-            if (thumbnail) {
-                const img = container.createEl('img', {
-                    attr: {
-                        src: thumbnail,
-                        alt: file.name
-                    }
-                });
-            } else {
-                // Fallback to video element
-                const video = container.createEl('video', {
-                    attr: {
-                        src: resourcePath,
-                        muted: true,
-                        preload: 'metadata'
-                    }
-                });
-            }
-            
-            // Add play icon overlay
-            const playIcon = container.createEl('div', { cls: 'video-play-icon' });
-            playIcon.innerHTML = '▶';
-            
-            container.addEventListener('click', () => {
-                openMediaLightbox(this.app, allMediaFiles || [file], index || 0);
-            });
-            
-        } else if (this.isAudio(file.name)) {
-            const container = element.createEl('div', { cls: 'audio-thumbnail-container' });
-            const icon = container.createEl('div', { cls: 'audio-icon' });
-            icon.innerHTML = '🎵';
-            
-            const fileName = container.createEl('div', { cls: 'audio-filename' });
-            fileName.textContent = file.name;
-            
-            container.addEventListener('click', () => {
-                openMediaLightbox(this.app, allMediaFiles || [file], index || 0);
-            });
+        `;
+        
+        try {
+            const blob = new Blob([workerCode], { type: 'application/javascript' });
+            return new Worker(URL.createObjectURL(blob));
+        } catch (error) {
+            console.warn('Web Workers not supported, falling back to main thread');
+            return null;
         }
     }
 
-    async getVideoThumbnail(file, resourcePath) {
-        // Check cache first
+    async getVideoThumbnailWorker(file, resourcePath) {
+        if (this.thumbnailCache.has(file.path)) {
+            return this.thumbnailCache.get(file.path);
+        }
+        
+        const availableWorker = this.workerPool.find(w => !w.busy);
+        if (!availableWorker) {
+            return this.getVideoThumbnailFallback(file, resourcePath);
+        }
+        
+        return new Promise((resolve) => {
+            const id = `${file.path}-${Date.now()}`;
+            availableWorker.busy = true;
+            
+            const messageHandler = (e) => {
+                if (e.data.id === id) {
+                    availableWorker.worker.removeEventListener('message', messageHandler);
+                    availableWorker.busy = false;
+                    
+                    if (e.data.thumbnail) {
+                        this.thumbnailCache.set(file.path, e.data.thumbnail);
+                        resolve(e.data.thumbnail);
+                    } else {
+                        resolve(this.getVideoThumbnailFallback(file, resourcePath));
+                    }
+                }
+            };
+            
+            availableWorker.worker.addEventListener('message', messageHandler);
+            availableWorker.worker.postMessage({
+                id,
+                videoPath: resourcePath,
+                timestamp: 1
+            });
+            
+            setTimeout(() => {
+                availableWorker.worker.removeEventListener('message', messageHandler);
+                availableWorker.busy = false;
+                resolve(this.getVideoThumbnailFallback(file, resourcePath));
+            }, 5000);
+        });
+    }
+
+    async getVideoThumbnailFallback(file, resourcePath) {
         if (this.thumbnailCache.has(file.path)) {
             return this.thumbnailCache.get(file.path);
         }
@@ -267,29 +215,302 @@ class MediaGalleryPlugin extends Plugin {
             video.crossOrigin = 'anonymous';
             video.muted = true;
             video.src = resourcePath;
-            video.currentTime = 1; // Get frame at 1 second
+            video.currentTime = 1;
+            
+            let loaded = false;
+            
+            const cleanup = () => {
+                if (!loaded) {
+                    video.remove();
+                    canvas.remove();
+                    resolve(null);
+                }
+            };
+            
+            setTimeout(cleanup, 3000);
             
             video.onloadeddata = () => {
-                const ctx = canvas.getContext('2d');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                
-                ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-                
-                const thumbnail = canvas.toDataURL('image/jpeg', 0.8);
-                this.thumbnailCache.set(file.path, thumbnail);
-                
-                video.remove();
-                canvas.remove();
-                
-                resolve(thumbnail);
+                loaded = true;
+                try {
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+                    
+                    const thumbnail = canvas.toDataURL('image/jpeg', 0.8);
+                    this.thumbnailCache.set(file.path, thumbnail);
+                    
+                    resolve(thumbnail);
+                } catch (error) {
+                    resolve(null);
+                } finally {
+                    video.remove();
+                    canvas.remove();
+                }
             };
             
-            video.onerror = () => {
-                video.remove();
-                canvas.remove();
-                resolve(null);
-            };
+            video.onerror = cleanup;
+        });
+    }
+
+    async createGallery(el, config, ctx) {
+        el.empty();
+        
+        const loadingIndicator = el.createEl('div', { 
+            cls: 'gallery-loading',
+            text: 'Loading gallery...' 
+        });
+        
+        try {
+            const controller = new AbortController();
+            ctx.containerEl.onNodeRemoved = () => controller.abort();
+            
+            const allMediaFiles = await this.loadMediaFiles(config.paths, controller.signal);
+            
+            if (allMediaFiles.length === 0) {
+                loadingIndicator.remove();
+                el.createEl('div', {
+                    text: 'No media files found',
+                    cls: 'gallery-empty'
+                });
+                return;
+            }
+            
+            const sortedFiles = this.sortFiles(allMediaFiles, config.sortOrder);
+            loadingIndicator.remove();
+            
+            await this.renderGallery(el, sortedFiles, config, controller.signal);
+            
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                loadingIndicator.remove();
+                el.createEl('div', {
+                    text: `Error: ${error.message}`,
+                    cls: 'gallery-error'
+                });
+            }
+        }
+    }
+
+    async loadMediaFiles(paths, signal) {
+        const allMediaFiles = [];
+        
+        if (paths.length === 1 && paths[0] === './') {
+            const rootFolder = this.app.vault.getRoot();
+            allMediaFiles.push(...this.getAllMediaFromRoot(rootFolder));
+        } else {
+            for (const folderPath of paths) {
+                if (signal.aborted) break;
+                
+                const folder = this.app.vault.getAbstractFileByPath(folderPath);
+                if (!folder) continue;
+                
+                if (folder.children !== undefined) {
+                    const mediaFiles = this.getMediaFiles(folder);
+                    allMediaFiles.push(...mediaFiles);
+                }
+            }
+        }
+        
+        return allMediaFiles;
+    }
+
+    async renderGallery(el, files, config, signal) {
+        const galleryContainer = el.createEl('div', { cls: 'media-gallery-container' });
+        
+        const infoBar = galleryContainer.createEl('div', { cls: 'gallery-info-bar' });
+        const fileCountText = config.displayType === 'compact' ? 
+            `${files.length} files found (showing first ${config.limit})` : 
+            `${files.length} files found`;
+        infoBar.createEl('span', { text: fileCountText });
+        
+        const grid = galleryContainer.createEl('div', { 
+            cls: 'media-gallery-grid',
+            attr: { style: `grid-template-columns: repeat(auto-fill, minmax(${config.gridSize}px, 1fr));` }
+        });
+        
+        const filesToDisplay = config.displayType === 'compact' ? 
+            files.slice(0, config.limit) : 
+            files;
+        
+        await this.renderBatchItems(grid, filesToDisplay, config, signal, 0);
+        
+        this.addStyles();
+    }
+
+    async renderBatchItems(container, files, config, signal, startIndex = 0) {
+        const batchSize = config.batchSize || 10;
+        const endIndex = Math.min(startIndex + batchSize, files.length);
+        
+        for (let i = startIndex; i < endIndex; i++) {
+            if (signal.aborted) return;
+            
+            const file = files[i];
+            const item = container.createEl('div', { cls: 'gallery-item' });
+            
+            if (config.enableLazyLoad) {
+                item.dataset.file = JSON.stringify({
+                    name: file.name,
+                    path: file.path,
+                    index: i,
+                    allFiles: files.map(f => ({ name: f.name, path: f.path }))
+                });
+                item.classList.add('lazy-load');
+                
+                const placeholder = item.createEl('div', { cls: 'gallery-placeholder' });
+                placeholder.createEl('span', { text: this.getFileTypeIcon(file.name) });
+                
+                this.intersectionObserver.observe(item);
+            } else {
+                await this.loadMediaElement(item, file, i, files);
+            }
+        }
+        
+        if (endIndex < files.length && !signal.aborted) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+            await this.renderBatchItems(container, files, config, signal, endIndex);
+        }
+    }
+
+    initIntersectionObserver() {
+        this.intersectionObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const item = entry.target;
+                    this.loadMediaElement(item).catch(console.error);
+                    this.intersectionObserver.unobserve(item);
+                }
+            });
+        }, {
+            rootMargin: '100px 0px',
+            threshold: 0.1
+        });
+    }
+
+    async loadMediaElement(element, file = null, index = null, allMediaFiles = null) {
+        if (!file && element.dataset.file) {
+            const fileData = JSON.parse(element.dataset.file);
+            file = this.app.vault.getAbstractFileByPath(fileData.path);
+            index = fileData.index;
+            
+            if (fileData.allFiles) {
+                allMediaFiles = fileData.allFiles.map(fileInfo => 
+                    this.app.vault.getAbstractFileByPath(fileInfo.path)
+                ).filter(Boolean);
+            }
+        }
+        
+        if (!file) return;
+        
+        const requestKey = file.path;
+        if (this.pendingRequests.has(requestKey)) {
+            return;
+        }
+        
+        this.pendingRequests.set(requestKey, true);
+        
+        try {
+            element.innerHTML = '';
+            element.classList.remove('lazy-load');
+            
+            const resourcePath = this.app.vault.getResourcePath(file);
+            
+            if (this.isImage(file.name)) {
+                await this.loadImageElement(element, file, resourcePath, allMediaFiles, index);
+            } else if (this.isVideo(file.name)) {
+                await this.loadVideoElement(element, file, resourcePath, allMediaFiles, index);
+            } else if (this.isAudio(file.name)) {
+                this.loadAudioElement(element, file, allMediaFiles, index);
+            }
+        } catch (error) {
+            console.error('Error loading media element:', error);
+            this.showErrorState(element, file.name);
+        } finally {
+            this.pendingRequests.delete(requestKey);
+        }
+    }
+
+    async loadImageElement(element, file, resourcePath, allMediaFiles, index) {
+        const img = element.createEl('img', {
+            attr: {
+                src: resourcePath,
+                alt: file.name,
+                loading: 'lazy'
+            }
+        });
+        
+        requestIdleCallback(() => {
+            img.addEventListener('click', () => {
+                openMediaLightbox(this.app, allMediaFiles || [file], index || 0);
+            });
+        });
+    }
+
+    async loadVideoElement(element, file, resourcePath, allMediaFiles, index) {
+        const container = element.createEl('div', { cls: 'video-thumbnail-container' });
+        
+        try {
+            const thumbnail = await this.getVideoThumbnailWorker(file, resourcePath);
+            
+            if (thumbnail) {
+                const img = container.createEl('img', {
+                    attr: {
+                        src: thumbnail,
+                        alt: file.name,
+                        loading: 'lazy'
+                    }
+                });
+            } else {
+                const video = container.createEl('video', {
+                    attr: {
+                        src: resourcePath,
+                        muted: true,
+                        preload: 'metadata'
+                    }
+                });
+            }
+        } catch (error) {
+            const video = container.createEl('video', {
+                attr: {
+                    src: resourcePath,
+                    muted: true,
+                    preload: 'metadata'
+                }
+            });
+        }
+        
+        const playIcon = container.createEl('div', { cls: 'video-play-icon' });
+        playIcon.innerHTML = '▶';
+        
+        requestIdleCallback(() => {
+            container.addEventListener('click', () => {
+                openMediaLightbox(this.app, allMediaFiles || [file], index || 0);
+            });
+        });
+    }
+
+    loadAudioElement(element, file, allMediaFiles, index) {
+        const container = element.createEl('div', { cls: 'audio-thumbnail-container' });
+        const icon = container.createEl('div', { cls: 'audio-icon' });
+        icon.innerHTML = '🎵';
+        
+        const fileName = container.createEl('div', { cls: 'audio-filename' });
+        fileName.textContent = file.name;
+        
+        requestIdleCallback(() => {
+            container.addEventListener('click', () => {
+                openMediaLightbox(this.app, allMediaFiles || [file], index || 0);
+            });
+        });
+    }
+
+    showErrorState(element, filename) {
+        element.innerHTML = '';
+        const errorDiv = element.createEl('div', { cls: 'gallery-error-state' });
+        errorDiv.createEl('div', { text: '❌' });
+        errorDiv.createEl('div', { 
+            text: filename,
+            cls: 'gallery-error-filename'
         });
     }
 
@@ -300,10 +521,8 @@ class MediaGalleryPlugin extends Plugin {
             
             for (const child of currentFolder.children) {
                 if (child.children !== undefined) {
-                    // It's a folder, recurse into it
                     traverse(child);
                 } else {
-                    // It's a file, check if it's media
                     if (this.isMediaFile(child.name)) {
                         mediaFiles.push(child);
                     }
@@ -386,6 +605,12 @@ class MediaGalleryPlugin extends Plugin {
                 padding: 10px;
             }
             
+            .gallery-loading {
+                padding: 20px;
+                text-align: center;
+                color: var(--text-muted);
+            }
+            
             .gallery-info-bar {
                 margin-bottom: 10px;
                 padding: 8px 12px;
@@ -431,6 +656,26 @@ class MediaGalleryPlugin extends Plugin {
                 background: var(--background-modifier-hover);
                 color: var(--text-muted);
                 font-size: 24px;
+            }
+            
+            .gallery-error-state {
+                width: 100%;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                background: var(--background-modifier-error);
+                color: var(--text-error);
+                font-size: 12px;
+                text-align: center;
+                padding: 10px;
+            }
+            
+            .gallery-error-filename {
+                margin-top: 5px;
+                word-break: break-word;
+                font-size: 10px;
             }
             
             .video-thumbnail-container,
@@ -487,11 +732,31 @@ class MediaGalleryPlugin extends Plugin {
         
         document.head.appendChild(style);
     }
+
+    onunload() {
+        const styles = document.getElementById('media-gallery-styles');
+        if (styles) styles.remove();
+        const lightboxStyles = document.getElementById('media-lightbox-styles');
+        if (lightboxStyles) lightboxStyles.remove();
+        
+        const lightbox = document.getElementById('media-lightbox-overlay');
+        if (lightbox) lightbox.remove();
+        
+        if (this.intersectionObserver) {
+            this.intersectionObserver.disconnect();
+        }
+        
+        this.workerPool.forEach(workerInfo => {
+            workerInfo.worker.terminate();
+        });
+        this.workerPool = [];
+        
+        this.thumbnailCache.clear();
+        this.pendingRequests.clear();
+    }
 }
 
-// Enhanced lightbox implementation with performance optimizations
 function openMediaLightbox(app, mediaFiles, startIndex) {
-    // Remove any existing lightbox
     const existing = document.getElementById('media-lightbox-overlay');
     if (existing) existing.remove();
 
@@ -504,11 +769,9 @@ function openMediaLightbox(app, mediaFiles, startIndex) {
         slideshowActive: false
     };
 
-    // Create overlay
     const overlay = document.createElement('div');
     overlay.id = 'media-lightbox-overlay';
 
-    // Top bar with enhanced controls
     const topBar = document.createElement('div');
     topBar.className = 'lightbox-topbar';
 
@@ -580,7 +843,6 @@ function openMediaLightbox(app, mediaFiles, startIndex) {
     topBar.appendChild(leftControls);
     topBar.appendChild(rightControls);
 
-    // Main area
     const mainArea = document.createElement('div');
     mainArea.className = 'lightbox-main';
 
@@ -606,12 +868,10 @@ function openMediaLightbox(app, mediaFiles, startIndex) {
     mainArea.appendChild(mediaContainer);
     mainArea.appendChild(nextBtn);
 
-    // Enhanced thumbnails with virtualization for large galleries
     const thumbContainer = document.createElement('div');
     thumbContainer.className = 'lightbox-thumbnails';
     thumbContainer.id = 'lightbox-thumbnails';
 
-    // Only render visible thumbnails for performance
     const maxVisibleThumbs = Math.min(mediaFiles.length, 20);
     const startThumb = Math.max(0, startIndex - Math.floor(maxVisibleThumbs / 2));
     const endThumb = Math.min(mediaFiles.length, startThumb + maxVisibleThumbs);
@@ -630,7 +890,6 @@ function openMediaLightbox(app, mediaFiles, startIndex) {
             img.alt = file.name;
             thumb.appendChild(img);
         } else if (isVideo(file.name)) {
-            // Use cached thumbnail if available
             const video = document.createElement('video');
             video.src = resourcePath;
             video.muted = true;
@@ -658,20 +917,16 @@ function openMediaLightbox(app, mediaFiles, startIndex) {
     overlay.appendChild(thumbContainer);
     document.body.appendChild(overlay);
 
-    // Add enhanced styles
     addLightboxStyles();
 
-    // Store references for cleanup
     state.randomBtn = randomBtn;
     state.slideshowBtn = slideshowBtn;
     state.fileLink = fileLink;
     state.fileMeta = fileMeta;
     state.intervalInput = intervalInput;
 
-    // Update initial media
     updateMedia(state, fileLink, fileMeta);
 
-    // Enhanced event listeners
     const keyHandler = (e) => {
         if (e.key === 'ArrowLeft') navigate(state, -1);
         if (e.key === 'ArrowRight') navigate(state, 1);
@@ -696,7 +951,6 @@ function openMediaLightbox(app, mediaFiles, startIndex) {
 
     mainArea.addEventListener('wheel', wheelHandler, { passive: false });
 
-    // Store cleanup function
     overlay.dataset.cleanup = 'true';
     overlay.addEventListener('cleanup', () => {
         document.removeEventListener('keydown', keyHandler);
@@ -727,7 +981,6 @@ function closeLightbox(state) {
 
 function toggleSlideshow(state, slideshowBtn, intervalInput) {
     if (state.slideshowActive) {
-        // Stop slideshow
         clearInterval(state.slideshowInterval);
         state.slideshowInterval = null;
         state.slideshowActive = false;
@@ -735,7 +988,6 @@ function toggleSlideshow(state, slideshowBtn, intervalInput) {
         slideshowBtn.classList.remove('active');
         intervalInput.disabled = false;
     } else {
-        // Start slideshow
         const interval = parseInt(intervalInput.value) || 3;
         state.slideshowActive = true;
         slideshowBtn.textContent = '⏸ Stop';
@@ -806,7 +1058,6 @@ function updateMedia(state, fileLink, fileMeta) {
         img.src = resourcePath;
         img.alt = file.name;
 
-        // Enhanced zoom and pan functionality
         let zoomLevel = 1;
         let panX = 0;
         let panY = 0;
@@ -818,7 +1069,7 @@ function updateMedia(state, fileLink, fileMeta) {
 
         img.addEventListener('click', (e) => {
             e.preventDefault();
-            zoomLevel = Math.min(zoomLevel + 1, 5); // Max zoom 5x
+            zoomLevel = Math.min(zoomLevel + 1, 5);
             updateTransform();
         });
 
@@ -832,7 +1083,6 @@ function updateMedia(state, fileLink, fileMeta) {
             updateTransform();
         });
 
-        // Enhanced wheel zoom
         const wheelHandler = (e) => {
             if (!document.querySelector('img:hover')) return;
             e.preventDefault();
@@ -852,7 +1102,6 @@ function updateMedia(state, fileLink, fileMeta) {
 
         img.addEventListener('wheel', wheelHandler, { passive: false });
 
-        // Enhanced panning
         img.addEventListener('mousemove', (e) => {
             if (zoomLevel > 1) {
                 const rect = container.getBoundingClientRect();
@@ -919,7 +1168,6 @@ function updateMedia(state, fileLink, fileMeta) {
         container.appendChild(audioContainer);
     }
 
-    // Update active thumbnail
     const thumbs = document.querySelectorAll('.lightbox-thumb');
     thumbs.forEach((thumb, index) => {
         const thumbIndex = parseInt(thumb.dataset.index);
