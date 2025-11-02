@@ -331,10 +331,53 @@ class MediaGalleryPlugin extends Plugin {
         galleryContainer._config = config;
 
         const infoBar = galleryContainer.createEl('div', { cls: 'gallery-info-bar' });
-        const fileCountText = config.displayType === 'compact' ? 
-            `${files.length} files found (showing first ${config.limit})` : 
-            `${files.length} files found`;
-        infoBar.createEl('span', { text: fileCountText });
+        
+        // Левая часть - информация
+        const leftInfo = infoBar.createEl('div', { cls: 'gallery-info-left' });
+        
+        // Правая часть - кнопка
+        const rightActions = infoBar.createEl('div', { cls: 'gallery-info-right' });
+        
+        // Вычисляем общий размер всех файлов
+        const totalBytes = files.reduce((sum, file) => sum + file.stat.size, 0);
+        const totalSize = this.formatFileSize(totalBytes);
+        
+        // Создаем элементы информации
+        const totalFilesItem = leftInfo.createEl('div', { cls: 'info-item' });
+        totalFilesItem.createEl('span', { 
+            cls: 'info-icon',
+            text: '🖼️' 
+        });
+        totalFilesItem.createEl('span', { 
+            cls: 'info-text',
+            text: `${files.length} files` 
+        });
+        
+        const totalSizeItem = leftInfo.createEl('div', { cls: 'info-item' });
+        totalSizeItem.createEl('span', { 
+            cls: 'info-icon',
+            text: '💾' 
+        });
+        totalSizeItem.createEl('span', { 
+            cls: 'info-text',
+            text: totalSize 
+        });
+        
+        // Если компактный режим, показываем дополнительную информацию
+        if (config.displayType === 'compact') {
+            const showingItem = leftInfo.createEl('div', { cls: 'info-item' });
+            showingItem.createEl('span', { 
+                cls: 'info-icon',
+                text: '👁️' 
+            });
+            showingItem.createEl('span', { 
+                cls: 'info-text',
+                text: `Showing ${Math.min(files.length, config.limit)}` 
+            });
+        }
+        
+        // Кнопку загрузки помещаем справа
+        this.createUploadButton(rightActions, config, files, galleryContainer);
         
         const grid = galleryContainer.createEl('div', { 
             cls: 'media-gallery-grid',
@@ -345,7 +388,6 @@ class MediaGalleryPlugin extends Plugin {
             files.slice(0, config.limit) : 
             files;
         
-        this.createUploadButton(infoBar, config, filesToDisplay, galleryContainer);
         await this.renderBatchItems(grid, filesToDisplay, config, signal, 0);
     }
 
@@ -653,9 +695,9 @@ class MediaGalleryPlugin extends Plugin {
         return array;
     }
 
-    createUploadButton(infoBar, config, files, galleryContainer) {
-        const uploadBtn = infoBar.createEl('button', {
-            text: '📁 Upload Media',
+    createUploadButton(container, config, files, galleryContainer) {
+        const uploadBtn = container.createEl('button', {
+            text: '📤 Upload Media',
             cls: 'gallery-upload-btn'
         });
         
@@ -912,9 +954,18 @@ class MediaGalleryPlugin extends Plugin {
     formatFileSize(bytes) {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        
+        let size = parseFloat((bytes / Math.pow(k, i)).toFixed(2));
+        let unit = sizes[i];
+        
+        // Для больших размеров оставляем только целые числа
+        if (unit === 'GB' || unit === 'TB') {
+            size = Math.round(size * 10) / 10; // Округляем до одного знака после запятой
+        }
+        
+        return `${size} ${unit}`;
     }
 
     async handleFileUpload(files, targetPath, config, galleryContainer) {
