@@ -384,9 +384,12 @@ class MediaGalleryPlugin extends Plugin {
             attr: { style: `grid-template-columns: repeat(auto-fill, minmax(${config.gridSize}px, 1fr));` }
         });
         
+        // Файлы для отображения в галерее (с лимитом)
         const filesToDisplay = config.displayType === 'compact' ? 
             files.slice(0, config.limit) : 
             files;
+        
+        grid.dataset.allFiles = JSON.stringify(files.map(f => ({ name: f.name, path: f.path })));
         
         await this.renderBatchItems(grid, filesToDisplay, config, signal, 0);
     }
@@ -405,8 +408,7 @@ class MediaGalleryPlugin extends Plugin {
                 item.dataset.file = JSON.stringify({
                     name: file.name,
                     path: file.path,
-                    index: i,
-                    allFiles: files.map(f => ({ name: f.name, path: f.path }))
+                    index: i
                 });
                 item.classList.add('lazy-load');
                 
@@ -415,7 +417,14 @@ class MediaGalleryPlugin extends Plugin {
                 
                 this.intersectionObserver.observe(item);
             } else {
-                await this.loadMediaElement(item, file, i, files);
+                const grid = container.closest('.media-gallery-grid');
+                let allMediaFiles = [file];
+                if (grid && grid.dataset.allFiles) {
+                    allMediaFiles = JSON.parse(grid.dataset.allFiles).map(fileInfo => 
+                        this.app.vault.getAbstractFileByPath(fileInfo.path)
+                    ).filter(Boolean);
+                }
+                await this.loadMediaElement(item, file, i, allMediaFiles);
             }
         }
         
@@ -446,7 +455,12 @@ class MediaGalleryPlugin extends Plugin {
             file = this.app.vault.getAbstractFileByPath(fileData.path);
             index = fileData.index;
             
-            if (fileData.allFiles) {
+            const grid = element.closest('.media-gallery-grid');
+            if (grid && grid.dataset.allFiles) {
+                allMediaFiles = JSON.parse(grid.dataset.allFiles).map(fileInfo => 
+                    this.app.vault.getAbstractFileByPath(fileInfo.path)
+                ).filter(Boolean);
+            } else if (fileData.allFiles) {
                 allMediaFiles = fileData.allFiles.map(fileInfo => 
                     this.app.vault.getAbstractFileByPath(fileInfo.path)
                 ).filter(Boolean);
@@ -493,11 +507,10 @@ class MediaGalleryPlugin extends Plugin {
         });
         
         requestIdleCallback(() => {
-            const mediaElement = img; // или container для видео/аудио
+            const mediaElement = img;
             mediaElement.addEventListener('click', () => {
                 const galleryContainer = element.closest('.media-gallery-container');
                 openMediaLightbox(this.app, allMediaFiles || [file], index || 0, () => {
-                    // Этот callback будет вызван после удаления файла
                     this.refreshCurrentGallery(galleryContainer);
                 }, galleryContainer);
             });
@@ -541,11 +554,9 @@ class MediaGalleryPlugin extends Plugin {
         playIcon.innerHTML = '▶';
         
         requestIdleCallback(() => {
-            const mediaElement = img; // или container для видео/аудио
-            mediaElement.addEventListener('click', () => {
+            element.addEventListener('click', () => {
                 const galleryContainer = element.closest('.media-gallery-container');
                 openMediaLightbox(this.app, allMediaFiles || [file], index || 0, () => {
-                    // Этот callback будет вызван после удаления файла
                     this.refreshCurrentGallery(galleryContainer);
                 }, galleryContainer);
             });
@@ -561,11 +572,9 @@ class MediaGalleryPlugin extends Plugin {
         fileName.textContent = file.name;
         
         requestIdleCallback(() => {
-            const mediaElement = img; // или container для видео/аудио
-            mediaElement.addEventListener('click', () => {
+            container.addEventListener('click', () => {
                 const galleryContainer = element.closest('.media-gallery-container');
                 openMediaLightbox(this.app, allMediaFiles || [file], index || 0, () => {
-                    // Этот callback будет вызван после удаления файла
                     this.refreshCurrentGallery(galleryContainer);
                 }, galleryContainer);
             });
@@ -1090,11 +1099,7 @@ function updateThumbnails(state) {
     
     thumbContainer.innerHTML = '';
     
-    const maxVisibleThumbs = Math.min(state.mediaFiles.length, 20);
-    const startThumb = Math.max(0, state.currentIndex - Math.floor(maxVisibleThumbs / 2));
-    const endThumb = Math.min(state.mediaFiles.length, startThumb + maxVisibleThumbs);
-    
-    for (let i = startThumb; i < endThumb; i++) {
+    for (let i = 0; i < state.mediaFiles.length; i++) {
         const file = state.mediaFiles[i];
         const thumb = document.createElement('div');
         thumb.className = 'lightbox-thumb';
@@ -1255,11 +1260,7 @@ function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryCo
     thumbContainer.className = 'lightbox-thumbnails';
     thumbContainer.id = 'lightbox-thumbnails';
 
-    const maxVisibleThumbs = Math.min(mediaFiles.length, 20);
-    const startThumb = Math.max(0, startIndex - Math.floor(maxVisibleThumbs / 2));
-    const endThumb = Math.min(mediaFiles.length, startThumb + maxVisibleThumbs);
-
-    for (let i = startThumb; i < endThumb; i++) {
+    for (let i = 0; i < mediaFiles.length; i++) {
         const file = mediaFiles[i];
         const thumb = document.createElement('div');
         thumb.className = 'lightbox-thumb';

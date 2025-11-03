@@ -346,18 +346,38 @@
 
 .lightbox-thumbnails {
     display: flex;
-    gap: 10px;
-    padding: 15px;
+    gap: 8px;
+    padding: 12px;
     overflow-x: auto;
     background: var(--background-secondary);
-    max-height: 110px;
+    max-height: 120px;
     border-top: 1px solid var(--background-modifier-border);
+    scrollbar-width: thin;
+    scrollbar-color: var(--background-modifier-border) var(--background-secondary);
+}
+
+.lightbox-thumbnails::-webkit-scrollbar {
+    height: 8px;
+}
+
+.lightbox-thumbnails::-webkit-scrollbar-track {
+    background: var(--background-secondary);
+    border-radius: 4px;
+}
+
+.lightbox-thumbnails::-webkit-scrollbar-thumb {
+    background: var(--background-modifier-border);
+    border-radius: 4px;
+}
+
+.lightbox-thumbnails::-webkit-scrollbar-thumb:hover {
+    background: var(--interactive-accent);
 }
 
 .lightbox-thumb {
     flex-shrink: 0;
-    width: 80px;
-    height: 80px;
+    width: 70px;
+    height: 70px;
     cursor: pointer;
     border-radius: 4px;
     overflow: hidden;
@@ -366,14 +386,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-}
-
-.lightbox-thumb:hover {
-    transform: scale(1.1);
+    position: relative;
 }
 
 .lightbox-thumb.active {
     border-color: var(--interactive-accent);
+    transform: scale(1.05);
+}
+
+.lightbox-thumb:hover {
+    transform: scale(1.08);
 }
 
 .lightbox-thumb img,
@@ -384,7 +406,7 @@
 }
 
 .audio-thumb {
-    font-size: 24px;
+    font-size: 20px;
     color: var(--text-muted);
 }
 
@@ -760,8 +782,7 @@
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
-
-/* Адаптивность для мобильных устройств */
+/* Стили для мобильных устройств */
 @media (max-width: 768px) {
     .gallery-info-bar {
         flex-direction: column;
@@ -784,6 +805,192 @@
     
     .info-text {
         font-size: 12px;
+    }
+
+    .lightbox-topbar {
+        flex-direction: column;
+        gap: 10px;
+        padding: 10px 15px;
+        min-height: auto;
+    }
+
+    .lightbox-controls-left,
+    .lightbox-controls-right {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .lightbox-controls-left {
+        order: 2;
+        margin-top: 5px;
+    }
+
+    .lightbox-controls-right {
+        order: 1;
+    }
+
+    .lightbox-file-info {
+        flex-direction: column;
+        gap: 2px;
+        align-items: flex-start;
+        max-width: 200px;
+    }
+
+    .lightbox-file-link {
+        max-width: 180px;
+        font-size: 12px;
+        padding: 6px 10px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .lightbox-file-meta {
+        font-size: 10px;
+    }
+
+    .lightbox-slideshow-container {
+        gap: 3px;
+    }
+
+    .lightbox-interval-input {
+        width: 50px;
+        padding: 6px;
+        font-size: 12px;
+    }
+
+    .lightbox-random-btn,
+    .lightbox-slideshow-btn,
+    .lightbox-delete-btn,
+    .lightbox-close-btn {
+        padding: 6px 10px;
+        font-size: 12px;
+        white-space: nowrap;
+    }
+
+    .lightbox-close-box {
+        transform: none;
+        padding: 0;
+        height: auto;
+    }
+
+    .lightbox-close-btn {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+    }
+
+    /* Улучшаем навигационные кнопки для мобильных */
+    .lightbox-nav {
+        width: 44px;
+        height: 44px;
+        font-size: 36px;
+    }
+
+    .lightbox-prev {
+        left: 10px;
+    }
+
+    .lightbox-next {
+        right: 10px;
+    }
+
+    .lightbox-nav span {
+        transform: translateY(-3px);
+    }
+
+    /* Адаптируем основной контейнер */
+    .lightbox-media-container {
+        padding: 10px;
+    }
+
+    /* Адаптируем миниатюры */
+    .lightbox-thumbnails {
+        padding: 8px;
+        max-height: 80px;
+    }
+
+    .lightbox-thumb {
+        width: 50px;
+        height: 50px;
+    }
+
+    .audio-thumb {
+        font-size: 16px;
+    }
+}
+
+/* Дополнительные улучшения для очень маленьких экранов */
+@media (max-width: 480px) {
+    .lightbox-topbar {
+        padding: 8px 10px;
+    }
+
+    .lightbox-controls-left,
+    .lightbox-controls-right {
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+
+    .lightbox-file-link {
+        max-width: 120px;
+        font-size: 11px;
+    }
+
+    .lightbox-random-btn,
+    .lightbox-slideshow-btn,
+    .lightbox-delete-btn {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+
+    .lightbox-slideshow-container {
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .lightbox-interval-input {
+        width: 40px;
+        padding: 4px;
+        font-size: 11px;
+    }
+}
+
+/* Улучшаем доступность для сенсорных устройств */
+@media (hover: none) and (pointer: coarse) {
+    .lightbox-nav {
+        width: 50px;
+        height: 50px;
+        background: rgba(0, 0, 0, 0.7);
+    }
+
+    .lightbox-random-btn,
+    .lightbox-slideshow-btn,
+    .lightbox-delete-btn,
+    .lightbox-close-btn {
+        min-height: 44px; /* Минимальный размер для сенсорных целей */
+    }
+
+    .lightbox-thumb {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
+/* Скрываем некоторые элементы на очень маленьких экранах */
+@media (max-width: 360px) {
+    .lightbox-slideshow-container .lightbox-interval-input {
+        display: none;
+    }
+    
+    .lightbox-slideshow-btn {
+        padding: 4px 6px;
+        font-size: 10px;
+    }
+    
+    .lightbox-random-btn {
+        padding: 4px 6px;
+        font-size: 10px;
     }
 }
 
