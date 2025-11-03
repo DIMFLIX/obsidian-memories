@@ -69,12 +69,12 @@
 ### Method 1: Via Community Plugins (recommended)
 1. Open **Settings** → **Community plugins**
 2. Disable **Restricted mode** if enabled
-3. Click **Browse** and search for **"Obsidian Memories"**
+3. Click **Browse** and search for **"Memories"**
 4. Click **Install**, then **Enable**
 
 ### Method 2: Manual Installation
 1. Download the latest version from [releases](https://github.com/DIMFLIX/obsidian-memories/releases)
-2. Create a folder `obsidian-memories` in `.obsidian/plugins/` of your vault
+2. Create a folder `memories` in `.obsidian/plugins/` of your vault
 3. Extract the files into the created folder
 4. Reload Obsidian and activate the plugin in settings
 

@@ -70,12 +70,12 @@
 ### Метод 1: Через Community Plugins (рекомендуется)
 1. Откройте **Настройки** → **Community plugins**
 2. Отключите **Restricted mode**, если он включен
-3. Нажмите **Browse** и найдите **"Obsidian Memories"**
+3. Нажмите **Browse** и найдите **"Memories"**
 4. Нажмите **Install**, затем **Enable**
 
 ### Метод 2: Ручная установка
 1. Скачайте последнюю версию из [релизов](https://github.com/DIMFLIX/obsidian-memories/releases)
-2. Создайте папку `obsidian-memories` в `.obsidian/plugins/` вашего хранилища
+2. Создайте папку `memories` в `.obsidian/plugins/` вашего хранилища
 3. Распакуйте файлы в созданную папку
 4. Перезагрузите Obsidian и активируйте плагин в настройках
 
