@@ -354,8 +354,26 @@
     border-top: 1px solid var(--background-modifier-border);
     scrollbar-width: thin;
     scrollbar-color: var(--background-modifier-border) var(--background-secondary);
+    cursor: grab;
+    user-select: none;
+    /* Плавная прокрутка по умолчанию */
+    scroll-behavior: smooth;
 }
 
+.lightbox-thumbnails.dragging {
+    cursor: grabbing;
+    scroll-behavior: auto; /* Отключаем плавность при перетаскивании */
+}
+
+.lightbox-thumbnails.scrolling {
+    scroll-behavior: smooth; /* Включаем плавность при прокрутке колесиком */
+}
+
+.lightbox-thumbnails:active {
+    cursor: grabbing;
+}
+
+/* Улучшаем видимость скроллбара */
 .lightbox-thumbnails::-webkit-scrollbar {
     height: 8px;
 }
@@ -368,10 +386,21 @@
 .lightbox-thumbnails::-webkit-scrollbar-thumb {
     background: var(--background-modifier-border);
     border-radius: 4px;
+    transition: background 0.2s ease;
 }
 
 .lightbox-thumbnails::-webkit-scrollbar-thumb:hover {
     background: var(--interactive-accent);
+}
+
+/* Подсвечиваем скроллбар при прокрутке */
+.lightbox-thumbnails.scrolling::-webkit-scrollbar-thumb {
+    background: var(--interactive-accent);
+}
+
+/* Для Firefox */
+.lightbox-thumbnails.scrolling {
+    scrollbar-color: var(--interactive-accent) var(--background-secondary);
 }
 
 .lightbox-thumb {
@@ -991,6 +1020,23 @@
     .lightbox-random-btn {
         padding: 4px 6px;
         font-size: 10px;
+    }
+}
+
+
+/* отключаем перетаскивание мышкой для мобильных устройств */
+@media (hover: none) and (pointer: coarse) {
+    .lightbox-thumbnails {
+        cursor: default;
+    }
+    
+    .lightbox-thumbnails.dragging {
+        cursor: default;
+    }
+    
+    /* На мобильных увеличиваем область прокрутки */
+    .lightbox-thumbnails {
+        padding: 15px 12px;
     }
 }
 

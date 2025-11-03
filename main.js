@@ -1296,6 +1296,56 @@ function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryCo
         thumbContainer.appendChild(thumb);
     }
 
+    // Поддержка перетаскивания мышкой
+    let isDragging = false;
+    let startX;
+    let scrollLeft;
+
+    thumbContainer.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        thumbContainer.classList.add('dragging');
+        startX = e.pageX - thumbContainer.offsetLeft;
+        scrollLeft = thumbContainer.scrollLeft;
+    });
+
+    thumbContainer.addEventListener('mouseleave', () => {
+        isDragging = false;
+        thumbContainer.classList.remove('dragging');
+    });
+
+    thumbContainer.addEventListener('mouseup', () => {
+        isDragging = false;
+        thumbContainer.classList.remove('dragging');
+    });
+
+    thumbContainer.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        const x = e.pageX - thumbContainer.offsetLeft;
+        const walk = (x - startX) * 2; // множитель для скорости прокрутки
+        thumbContainer.scrollLeft = scrollLeft - walk;
+    });
+
+    thumbContainer.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        thumbContainer.scrollLeft += e.deltaY * 2; // множитель для скорости прокрутки
+        
+        // Добавляем визуальную обратную связь
+        thumbContainer.classList.add('scrolling');
+        clearTimeout(thumbContainer.scrollTimeout);
+        thumbContainer.scrollTimeout = setTimeout(() => {
+            thumbContainer.classList.remove('scrolling');
+        }, 150);
+    });
+    
+    // Отключаем перетаскивание при клике на миниатюру
+    thumbContainer.addEventListener('click', (e) => {
+        if (isDragging) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    });
+
     overlay.appendChild(topBar);
     overlay.appendChild(mainArea);
     overlay.appendChild(thumbContainer);
