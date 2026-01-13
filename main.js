@@ -1,4 +1,4 @@
-const { Plugin, Notice, AbstractInputSuggest } = require('obsidian');
+const { Plugin, Notice, AbstractInputSuggest, Scope } = require('obsidian');
 
 class FolderSuggest extends AbstractInputSuggest {
     constructor(app, inputEl) {
@@ -821,6 +821,9 @@ class MediaGalleryPlugin extends Plugin {
         });
         
         const pasteHandler = (e) => {
+            // Only handle paste if form overlay still exists in DOM
+            if (!document.body.contains(overlay)) return;
+            
             if (e.clipboardData && e.clipboardData.files.length > 0) {
                 const newFiles = Array.from(e.clipboardData.files);
                 selectedFiles = [...selectedFiles, ...newFiles];
@@ -831,24 +834,22 @@ class MediaGalleryPlugin extends Plugin {
             }
         };
         
-        document.addEventListener('paste', pasteHandler);
+        // Register paste event using Plugin API - will auto-cleanup on plugin unload
+        this.registerDomEvent(document, 'paste', pasteHandler);
         
         this.registerDomEvent(cancelBtn, 'click', () => {
-            document.removeEventListener('paste', pasteHandler);
             overlay.remove();
         });
         
         this.registerDomEvent(uploadBtn, 'click', async () => {
             if (selectedFiles.length > 0) {
                 await this.handleFileUpload(selectedFiles, pathSelect.value, config, galleryContainer);
-                document.removeEventListener('paste', pasteHandler);
                 overlay.remove();
             }
         });
         
         this.registerDomEvent(overlay, 'click', (e) => {
             if (e.target === overlay) {
-                document.removeEventListener('paste', pasteHandler);
                 overlay.remove();
             }
         });
@@ -1016,11 +1017,6 @@ class MediaGalleryPlugin extends Plugin {
     }
 
     onunload() {
-        const styles = document.getElementById('media-gallery-styles');
-        if (styles) styles.remove();
-        const lightboxStyles = document.getElementById('media-lightbox-styles');
-        if (lightboxStyles) lightboxStyles.remove();
-        
         const lightbox = document.getElementById('memories-lightbox-overlay');
         if (lightbox) lightbox.remove();
         
@@ -1126,7 +1122,8 @@ function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryCo
         slideshowInterval: null,
         slideshowActive: false,
         onFileDeleted: onFileDeleted,
-        galleryContainer: galleryContainer
+        galleryContainer: galleryContainer,
+        scope: new Scope()
     };
 
     const overlay = document.createElement('div');
@@ -1334,17 +1331,10 @@ function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryCo
 
     updateMedia(state, fileLink, fileMeta);
 
-    const keyHandler = (e) => {
-        if (e.key === 'ArrowLeft') navigate(state, -1);
-        if (e.key === 'ArrowRight') navigate(state, 1);
-        if (e.key === 'Escape') closeLightbox(state);
-        if (e.key === ' ') {
-            e.preventDefault();
-            toggleSlideshow(state, slideshowBtn, intervalInput);
-        }
-    };
-
-    document.addEventListener('keydown', keyHandler);
+    state.scope.register([], 'ArrowLeft', () => { navigate(state, -1); return false; });
+    state.scope.register([], 'ArrowRight', () => { navigate(state, 1); return false; });
+    state.scope.register([], 'Escape', () => { closeLightbox(state); return false; });
+    state.scope.register([], 'Space', () => { toggleSlideshow(state, slideshowBtn, intervalInput); return false; });
 
     const wheelHandler = (e) => {
         if (document.querySelector('img:hover, video:hover')) return;
@@ -1360,7 +1350,7 @@ function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryCo
 
     overlay.dataset.cleanup = 'true';
     overlay.addEventListener('cleanup', () => {
-        document.removeEventListener('keydown', keyHandler);
+        state.scope.unregister();
         mainArea.removeEventListener('wheel', wheelHandler);
         if (state.slideshowInterval) {
             clearInterval(state.slideshowInterval);
@@ -1407,7 +1397,7 @@ function toggleSlideshow(state, slideshowBtn, intervalInput) {
         slideshowBtn.classList.add('active');
         intervalInput.disabled = true;
 
-        state.slideshowInterval = setInterval(() => {
+        state.slideshowInterval = window.setInterval(() => {
             navigate(state, 1);
         }, interval * 1000);
     }
@@ -1554,8 +1544,6 @@ function updateMedia(state, fileLink, fileMeta) {
         video.controls = true;
         video.autoplay = true;
         video.loop = true;
-        video.style.maxWidth = '100%';
-        video.style.maxHeight = '80vh';
         container.appendChild(video);
 
     } else if (isAudio(file.name)) {
@@ -1607,14 +1595,5 @@ function isAudio(filename) {
     const ext = filename.split('.').pop().toLowerCase();
     return ['mp3', 'wav', 'flac', 'ogg', 'aac', 'm4a', 'wma', 'opus', 'aiff', 'au'].includes(ext);
 }
-
-MediaGalleryPlugin.prototype.loadStyles = function() {
-    if (document.getElementById('media-gallery-styles')) return;
-    
-    const style = document.createElement('style');
-    style.id = 'media-gallery-styles';
-    style.textContent = require('../styles.css');
-    document.head.appendChild(style);
-};
 
 module.exports = MediaGalleryPlugin;
