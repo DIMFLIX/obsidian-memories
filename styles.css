@@ -1,24 +1,93 @@
-.media-gallery-container {
+.memories-media-gallery-container {
     width: 100%;
-    padding: 10px;
+    padding: 15px;
 }
 
-.gallery-loading {
+.memories-gallery-loading {
     padding: 20px;
     text-align: center;
     color: var(--text-muted);
 }
 
-.gallery-info-bar {
-    margin-bottom: 10px;
-    padding: 8px 12px;
+.memories-gallery-info-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 12px 16px;
     background: var(--background-secondary);
-    border-radius: 4px;
-    color: var(--text-muted);
-    font-size: 14px;
+    border-radius: 8px;
+    border: 1px solid var(--background-modifier-border);
 }
 
-.media-gallery-grid {
+.memories-gallery-info-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.memories-gallery-info-right {
+    display: flex;
+    align-items: center;
+}
+
+.memories-info-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--background-primary);
+    border-radius: 6px;
+    border: 1px solid var(--background-modifier-border);
+    transition: all 0.2s ease;
+}
+
+.memories-info-item:hover {
+    background: var(--background-modifier-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.memories-info-icon {
+    font-size: 16px;
+    opacity: 0.8;
+}
+
+.memories-info-text {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-normal);
+    white-space: nowrap;
+}
+
+.memories-gallery-upload-btn {
+    background: var(--interactive-accent) !important;
+    color: var(--text-on-accent) !important;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.memories-gallery-upload-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.memories-gallery-upload-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.memories-media-gallery-grid {
     display: grid;
     gap: 15px;
     background-color: var(--background-secondary);
@@ -27,7 +96,7 @@
     border: 1px solid var(--background-modifier-border);
 }
 
-.gallery-item {
+.memories-gallery-item {
     aspect-ratio: 1;
     overflow: hidden;
     border-radius: 8px;
@@ -37,19 +106,19 @@
     position: relative;
 }
 
-.gallery-item:hover {
+.memories-gallery-item:hover {
     transform: scale(1.05);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
-.gallery-item img,
-.gallery-item video {
+.memories-gallery-item img,
+.memories-gallery-item video {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.gallery-placeholder {
+.memories-gallery-placeholder {
     width: 100%;
     height: 100%;
     display: flex;
@@ -60,7 +129,7 @@
     font-size: 24px;
 }
 
-.gallery-error-state {
+.memories-gallery-error-state {
     width: 100%;
     height: 100%;
     display: flex;
@@ -74,14 +143,14 @@
     padding: 10px;
 }
 
-.gallery-error-filename {
+.memories-gallery-error-filename {
     margin-top: 5px;
     word-break: break-word;
     font-size: 10px;
 }
 
-.video-thumbnail-container,
-.audio-thumbnail-container {
+.memories-video-thumbnail-container,
+.memories-audio-thumbnail-container {
     width: 100%;
     height: 100%;
     position: relative;
@@ -90,7 +159,7 @@
     justify-content: center;
 }
 
-.video-play-icon {
+.memories-video-play-icon {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -107,31 +176,45 @@
     pointer-events: none;
 }
 
-.audio-thumbnail-container {
+.memories-audio-thumbnail-container {
     flex-direction: column;
     padding: 10px;
     text-align: center;
 }
 
-.audio-icon {
+.memories-audio-icon {
     font-size: 32px;
     margin-bottom: 8px;
 }
 
-.audio-filename {
+.memories-audio-filename {
     font-size: 12px;
     color: var(--text-muted);
     word-break: break-word;
 }
 
-.gallery-error,
-.gallery-empty {
+.memories-gallery-error,
+.memories-gallery-empty {
     padding: 20px;
     text-align: center;
     color: var(--text-muted);
 }
 
-#media-lightbox-overlay {
+.memories-gallery-refreshing {
+    position: relative;
+    opacity: 0.7;
+}
+
+.memories-gallery-refreshing::after {
+    content: "🔄";
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 16px;
+    z-index: 10;
+}
+
+#memories-lightbox-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -143,7 +226,7 @@
     flex-direction: column;
 }
 
-.lightbox-topbar {
+.memories-lightbox-topbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -155,32 +238,32 @@
     min-height: 60px;
 }
 
-.lightbox-controls-left,
-.lightbox-controls-right {
+.memories-lightbox-controls-left,
+.memories-lightbox-controls-right {
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
-.lightbox-file-info {
+.memories-lightbox-file-info {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 4px;
 }
 
-.lightbox-file-meta {
+.memories-lightbox-file-meta {
     font-size: 12px;
     color: var(--text-muted);
 }
 
-.lightbox-slideshow-container {
+.memories-lightbox-slideshow-container {
     display: flex;
     align-items: center;
     gap: 5px;
 }
 
-.lightbox-interval-input {
+.memories-lightbox-interval-input {
     width: 60px;
     padding: 8px;
     border-radius: 6px;
@@ -190,14 +273,15 @@
     font-size: 14px;
 }
 
-.lightbox-interval-input:disabled {
+.memories-lightbox-interval-input:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-.lightbox-random-btn,
-.lightbox-slideshow-btn,
-.lightbox-close-btn {
+.memories-lightbox-random-btn,
+.memories-lightbox-slideshow-btn,
+.memories-lightbox-close-btn,
+.memories-lightbox-delete-btn {
     background: var(--interactive-normal);
     color: var(--text-normal);
     border: none;
@@ -209,27 +293,38 @@
     white-space: nowrap;
 }
 
-.lightbox-close-box {
+.memories-lightbox-close-box {
     height: 40px;
     transform: translate(20px, -15px);
     cursor: pointer;
     padding: 14px 14px 0px 0px;
 }
 
-.lightbox-random-btn:hover,
-.lightbox-slideshow-btn:hover,
-.lightbox-close-btn:hover,
-.lightbox-close-box:hover .lightbox-close-btn {
+.memories-lightbox-random-btn:hover,
+.memories-lightbox-slideshow-btn:hover,
+.memories-lightbox-close-btn:hover,
+.memories-lightbox-delete-btn:hover,
+.memories-lightbox-close-box:hover .memories-lightbox-close-btn {
     background: var(--interactive-hover);
 }
 
-.lightbox-random-btn.active,
-.lightbox-slideshow-btn.active {
+.memories-lightbox-random-btn.active,
+.memories-lightbox-slideshow-btn.active {
     background: var(--interactive-accent);
     color: white;
 }
 
-.lightbox-file-link {
+.memories-lightbox-delete-btn {
+    background: var(--background-modifier-error);
+    color: var(--text-error);
+}
+
+.memories-lightbox-delete-btn:hover {
+    background: var(--text-error);
+    color: white;
+}
+
+.memories-lightbox-file-link {
     color: var(--text-normal);
     text-decoration: none;
     padding: 8px 16px;
@@ -242,19 +337,19 @@
     white-space: nowrap;
 }
 
-.lightbox-file-link:hover {
+.memories-lightbox-file-link:hover {
     background: var(--interactive-hover);
     text-decoration: underline;
 }
 
-.lightbox-close-btn {
+.memories-lightbox-close-btn {
     font-size: 20px;
     width: 40px;
     height: 40px;
     padding: 0;
 }
 
-.lightbox-main {
+.memories-lightbox-main {
     flex: 1;
     display: flex;
     align-items: center;
@@ -264,7 +359,7 @@
     overflow: hidden;
 }
 
-.lightbox-media-container {
+.memories-lightbox-media-container {
     max-width: 100%;
     max-height: 100%;
     display: flex;
@@ -273,19 +368,12 @@
     padding: 20px;
 }
 
-.lightbox-media-container img,
-.lightbox-media-container video {
-    max-width: 100%;
-    max-height: 80vh;
-    object-fit: contain;
-}
-
-.lightbox-media-container img {
+.memories-lightbox-media-container img {
     transform-origin: center center;
     user-select: none;
 }
 
-.lightbox-audio-container {
+.memories-lightbox-audio-container {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -295,18 +383,18 @@
     border-radius: 12px;
 }
 
-.lightbox-audio-icon {
+.memories-lightbox-audio-icon {
     font-size: 64px;
 }
 
-.lightbox-audio-filename {
+.memories-lightbox-audio-filename {
     font-size: 18px;
     color: var(--text-normal);
     text-align: center;
     word-break: break-word;
 }
 
-.lightbox-nav {
+.memories-lightbox-nav {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
@@ -326,25 +414,25 @@
     padding: 0;
 }
 
-.lightbox-nav span {
+.memories-lightbox-nav span {
     display: block;
     line-height: 1;
     transform: translateY(-5px);
 }
 
-.lightbox-nav:hover {
+.memories-lightbox-nav:hover {
     background: rgba(0, 0, 0, 0.8);
 }
 
-.lightbox-prev {
+.memories-lightbox-prev {
     left: 20px;
 }
 
-.lightbox-next {
+.memories-lightbox-next {
     right: 20px;
 }
 
-.lightbox-thumbnails {
+.memories-lightbox-thumbnails {
     display: flex;
     gap: 8px;
     padding: 12px;
@@ -356,54 +444,50 @@
     scrollbar-color: var(--background-modifier-border) var(--background-secondary);
     cursor: grab;
     user-select: none;
-    /* Плавная прокрутка по умолчанию */
     scroll-behavior: smooth;
 }
 
-.lightbox-thumbnails.dragging {
+.memories-lightbox-thumbnails.dragging {
     cursor: grabbing;
-    scroll-behavior: auto; /* Отключаем плавность при перетаскивании */
+    scroll-behavior: auto;
 }
 
-.lightbox-thumbnails.scrolling {
-    scroll-behavior: smooth; /* Включаем плавность при прокрутке колесиком */
+.memories-lightbox-thumbnails.scrolling {
+    scroll-behavior: smooth;
 }
 
-.lightbox-thumbnails:active {
+.memories-lightbox-thumbnails:active {
     cursor: grabbing;
 }
 
-/* Улучшаем видимость скроллбара */
-.lightbox-thumbnails::-webkit-scrollbar {
+.memories-lightbox-thumbnails::-webkit-scrollbar {
     height: 8px;
 }
 
-.lightbox-thumbnails::-webkit-scrollbar-track {
+.memories-lightbox-thumbnails::-webkit-scrollbar-track {
     background: var(--background-secondary);
     border-radius: 4px;
 }
 
-.lightbox-thumbnails::-webkit-scrollbar-thumb {
+.memories-lightbox-thumbnails::-webkit-scrollbar-thumb {
     background: var(--background-modifier-border);
     border-radius: 4px;
     transition: background 0.2s ease;
 }
 
-.lightbox-thumbnails::-webkit-scrollbar-thumb:hover {
+.memories-lightbox-thumbnails::-webkit-scrollbar-thumb:hover {
     background: var(--interactive-accent);
 }
 
-/* Подсвечиваем скроллбар при прокрутке */
-.lightbox-thumbnails.scrolling::-webkit-scrollbar-thumb {
+.memories-lightbox-thumbnails.scrolling::-webkit-scrollbar-thumb {
     background: var(--interactive-accent);
 }
 
-/* Для Firefox */
-.lightbox-thumbnails.scrolling {
+.memories-lightbox-thumbnails.scrolling {
     scrollbar-color: var(--interactive-accent) var(--background-secondary);
 }
 
-.lightbox-thumb {
+.memories-lightbox-thumb {
     flex-shrink: 0;
     width: 70px;
     height: 70px;
@@ -418,29 +502,28 @@
     position: relative;
 }
 
-.lightbox-thumb.active {
+.memories-lightbox-thumb.active {
     border-color: var(--interactive-accent);
     transform: scale(1.05);
 }
 
-.lightbox-thumb:hover {
+.memories-lightbox-thumb:hover {
     transform: scale(1.08);
 }
 
-.lightbox-thumb img,
-.lightbox-thumb video {
+.memories-lightbox-thumb img,
+.memories-lightbox-thumb video {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.audio-thumb {
+.memories-audio-thumb {
     font-size: 20px;
     color: var(--text-muted);
 }
 
-/* Стили для формы загрузки */
-.upload-form-overlay {
+.memories-upload-form-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -453,7 +536,7 @@
     z-index: 10000;
 }
 
-.upload-form {
+.memories-upload-form {
     background: var(--background-primary);
     padding: 20px;
     border-radius: 8px;
@@ -462,26 +545,17 @@
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 }
 
-.upload-path-section {
+.memories-upload-path-section {
     margin-bottom: 15px;
 }
 
-.upload-path-section label {
+.memories-upload-path-section label {
     display: block;
     margin-bottom: 5px;
     font-weight: bold;
 }
 
-.upload-path-select {
-    width: 100%;
-    padding: 5px;
-    border-radius: 4px;
-    border: 1px solid var(--background-modifier-border);
-    background: var(--background-primary);
-    color: var(--text-normal);
-}
-
-.upload-drop-area {
+.memories-upload-drop-area {
     border: 2px dashed var(--background-modifier-border);
     border-radius: 8px;
     padding: 40px 20px;
@@ -491,62 +565,62 @@
     transition: all 0.3s ease;
 }
 
-.upload-drop-area:hover {
+.memories-upload-drop-area:hover {
     border-color: var(--interactive-accent);
     background: var(--background-modifier-hover);
 }
 
-.upload-drop-area.dragover {
+.memories-upload-drop-area.dragover {
     border-color: var(--interactive-accent);
     background: var(--background-modifier-active);
 }
 
-.upload-drop-area.has-files {
+.memories-upload-drop-area.has-files {
     border-color: var(--interactive-accent);
     background: var(--background-secondary);
 }
 
-.drop-area-content .drop-icon {
+.memories-drop-area-content .memories-drop-icon {
     font-size: 48px;
     margin-bottom: 10px;
 }
 
-.drop-hint {
+.memories-drop-hint {
     font-size: 12px;
     color: var(--text-muted);
     margin: 5px 0;
 }
 
-.upload-button-section {
+.memories-upload-button-section {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
 }
 
-.upload-cancel-btn,
-.upload-confirm-btn {
+.memories-upload-cancel-btn,
+.memories-upload-confirm-btn {
     padding: 8px 16px;
     border: none;
     border-radius: 4px;
     cursor: pointer;
 }
 
-.upload-cancel-btn {
+.memories-upload-cancel-btn {
     background: var(--background-modifier-border);
     color: var(--text-normal);
 }
 
-.upload-confirm-btn {
+.memories-upload-confirm-btn {
     background: var(--interactive-accent);
     color: white;
 }
 
-.upload-confirm-btn:disabled {
+.memories-upload-confirm-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-.upload-loading {
+.memories-upload-loading {
     padding: 10px;
     text-align: center;
     background: var(--background-modifier-active);
@@ -554,76 +628,7 @@
     margin: 10px 0;
 }
 
-.upload-file-list {
-    max-height: 200px;
-    overflow-y: auto;
-    margin: 10px 0;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    padding: 5px;
-    background: var(--background-primary);
-}
-
-.upload-file-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px;
-    margin: 2px 0;
-    background: var(--background-secondary);
-    border-radius: 3px;
-}
-
-.upload-file-name {
-    font-size: 12px;
-    color: var(--text-normal);
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.upload-remove-file {
-    background: var(--background-modifier-error);
-    color: var(--text-error);
-    border: none;
-    border-radius: 3px;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 10px;
-    margin-left: 8px;
-    flex-shrink: 0;
-}
-
-.upload-remove-file:hover {
-    background: var(--text-error);
-    color: white;
-}
-
-/* Стили для кнопки удаления в лайтбоксе */
-.lightbox-delete-btn {
-    background: var(--background-modifier-error);
-    color: var(--text-error);
-    border: none;
-    padding: 8px 16px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background 0.2s;
-    white-space: nowrap;
-}
-
-.lightbox-delete-btn:hover {
-    background: var(--text-error);
-    color: white;
-}
-
-/* Стили для контейнера списка файлов в форме загрузки */
-.upload-file-list-container {
+.memories-upload-file-list-container {
     margin-top: 15px;
     max-height: 300px;
     overflow: hidden;
@@ -631,14 +636,14 @@
     flex-direction: column;
 }
 
-.upload-file-list-title {
+.memories-upload-file-list-title {
     font-size: 14px;
     font-weight: bold;
     margin-bottom: 8px;
     color: var(--text-normal);
 }
 
-.upload-file-list {
+.memories-upload-file-list {
     max-height: 250px;
     overflow-y: auto;
     border: 1px solid var(--background-modifier-border);
@@ -647,7 +652,7 @@
     background: var(--background-primary);
 }
 
-.upload-file-item {
+.memories-upload-file-item {
     display: flex;
     align-items: center;
     padding: 8px;
@@ -657,12 +662,12 @@
     gap: 8px;
 }
 
-.upload-file-icon {
+.memories-upload-file-icon {
     font-size: 16px;
     flex-shrink: 0;
 }
 
-.upload-file-name {
+.memories-upload-file-name {
     font-size: 12px;
     color: var(--text-normal);
     flex: 1;
@@ -671,13 +676,13 @@
     white-space: nowrap;
 }
 
-.upload-file-size {
+.memories-upload-file-size {
     font-size: 11px;
     color: var(--text-muted);
     flex-shrink: 0;
 }
 
-.upload-remove-file {
+.memories-upload-remove-file {
     background: var(--background-modifier-error);
     color: var(--text-error);
     border: none;
@@ -692,180 +697,83 @@
     flex-shrink: 0;
 }
 
-.upload-remove-file:hover {
+.memories-upload-remove-file:hover {
     background: var(--text-error);
     color: white;
 }
 
-/* Стили для скроллбара */
-.upload-file-list::-webkit-scrollbar {
+.memories-upload-file-list::-webkit-scrollbar {
     width: 6px;
 }
 
-.upload-file-list::-webkit-scrollbar-track {
+.memories-upload-file-list::-webkit-scrollbar-track {
     background: var(--background-secondary);
     border-radius: 3px;
 }
 
-.upload-file-list::-webkit-scrollbar-thumb {
+.memories-upload-file-list::-webkit-scrollbar-thumb {
     background: var(--background-modifier-border);
     border-radius: 3px;
 }
 
-.upload-file-list::-webkit-scrollbar-thumb:hover {
+.memories-upload-file-list::-webkit-scrollbar-thumb:hover {
     background: var(--interactive-accent);
 }
 
-/* Индикатор обновления */
-.gallery-refreshing {
-    position: relative;
-    opacity: 0.7;
-}
-
-.gallery-refreshing::after {
-    content: "🔄";
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    font-size: 16px;
-    z-index: 10;
-}
-
-/* Стили для информационной панели галереи */
-.gallery-info-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    padding: 12px 16px;
-    background: var(--background-secondary);
-    border-radius: 8px;
-    border: 1px solid var(--background-modifier-border);
-}
-
-.gallery-info-left {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    flex-wrap: wrap;
-}
-
-.gallery-info-right {
-    display: flex;
-    align-items: center;
-}
-
-.info-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    background: var(--background-primary);
-    border-radius: 6px;
-    border: 1px solid var(--background-modifier-border);
-    transition: all 0.2s ease;
-}
-
-.info-item:hover {
-    background: var(--background-modifier-hover);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.info-icon {
-    font-size: 16px;
-    opacity: 0.8;
-}
-
-.info-text {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-normal);
-    white-space: nowrap;
-}
-
-/* Обновленные стили для кнопки загрузки */
-.gallery-upload-btn {
-    background: var(--interactive-accent) !important;
-    color: var(--text-on-accent) !important;
-    border: none;
-    padding: px 6 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.gallery-upload-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-}
-
-.gallery-upload-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-/* Стили для мобильных устройств */
 @media (max-width: 768px) {
-    .gallery-info-bar {
+    .memories-gallery-info-bar {
         flex-direction: column;
         gap: 12px;
         align-items: stretch;
     }
     
-    .gallery-info-left {
+    .memories-gallery-info-left {
         justify-content: center;
         gap: 10px;
     }
     
-    .gallery-info-right {
+    .memories-gallery-info-right {
         justify-content: center;
     }
     
-    .info-item {
+    .memories-info-item {
         padding: 4px 8px;
     }
     
-    .info-text {
+    .memories-info-text {
         font-size: 12px;
     }
 
-    .lightbox-topbar {
+    .memories-lightbox-topbar {
         flex-direction: column;
         gap: 10px;
         padding: 10px 15px;
         min-height: auto;
     }
 
-    .lightbox-controls-left,
-    .lightbox-controls-right {
+    .memories-lightbox-controls-left,
+    .memories-lightbox-controls-right {
         width: 100%;
         justify-content: space-between;
     }
 
-    .lightbox-controls-left {
+    .memories-lightbox-controls-left {
         order: 2;
         margin-top: 5px;
     }
 
-    .lightbox-controls-right {
+    .memories-lightbox-controls-right {
         order: 1;
     }
 
-    .lightbox-file-info {
+    .memories-lightbox-file-info {
         flex-direction: column;
         gap: 2px;
         align-items: flex-start;
         max-width: 200px;
     }
 
-    .lightbox-file-link {
+    .memories-lightbox-file-link {
         max-width: 180px;
         font-size: 12px;
         padding: 6px 10px;
@@ -874,174 +782,157 @@
         text-overflow: ellipsis;
     }
 
-    .lightbox-file-meta {
+    .memories-lightbox-file-meta {
         font-size: 10px;
     }
 
-    .lightbox-slideshow-container {
+    .memories-lightbox-slideshow-container {
         gap: 3px;
     }
 
-    .lightbox-interval-input {
+    .memories-lightbox-interval-input {
         width: 50px;
         padding: 6px;
         font-size: 12px;
     }
 
-    .lightbox-random-btn,
-    .lightbox-slideshow-btn,
-    .lightbox-delete-btn,
-    .lightbox-close-btn {
+    .memories-lightbox-random-btn,
+    .memories-lightbox-slideshow-btn,
+    .memories-lightbox-delete-btn,
+    .memories-lightbox-close-btn {
         padding: 6px 10px;
         font-size: 12px;
         white-space: nowrap;
     }
 
-    .lightbox-close-box {
+    .memories-lightbox-close-box {
         transform: none;
         padding: 0;
         height: auto;
     }
 
-    .lightbox-close-btn {
+    .memories-lightbox-close-btn {
         width: 32px;
         height: 32px;
         font-size: 16px;
     }
 
-    /* Улучшаем навигационные кнопки для мобильных */
-    .lightbox-nav {
+    .memories-lightbox-nav {
         width: 44px;
         height: 44px;
         font-size: 36px;
     }
 
-    .lightbox-prev {
+    .memories-lightbox-prev {
         left: 10px;
     }
 
-    .lightbox-next {
+    .memories-lightbox-next {
         right: 10px;
     }
 
-    .lightbox-nav span {
+    .memories-lightbox-nav span {
         transform: translateY(-3px);
     }
 
-    /* Адаптируем основной контейнер */
-    .lightbox-media-container {
+    .memories-lightbox-media-container {
         padding: 10px;
     }
 
-    /* Адаптируем миниатюры */
-    .lightbox-thumbnails {
+    .memories-lightbox-thumbnails {
         padding: 8px;
         max-height: 80px;
     }
 
-    .lightbox-thumb {
+    .memories-lightbox-thumb {
         width: 50px;
         height: 50px;
     }
 
-    .audio-thumb {
+    .memories-audio-thumb {
         font-size: 16px;
     }
 }
 
-/* Дополнительные улучшения для очень маленьких экранов */
 @media (max-width: 480px) {
-    .lightbox-topbar {
+    .memories-lightbox-topbar {
         padding: 8px 10px;
     }
 
-    .lightbox-controls-left,
-    .lightbox-controls-right {
+    .memories-lightbox-controls-left,
+    .memories-lightbox-controls-right {
         flex-wrap: wrap;
         gap: 5px;
     }
 
-    .lightbox-file-link {
+    .memories-lightbox-file-link {
         max-width: 120px;
         font-size: 11px;
     }
 
-    .lightbox-random-btn,
-    .lightbox-slideshow-btn,
-    .lightbox-delete-btn {
+    .memories-lightbox-random-btn,
+    .memories-lightbox-slideshow-btn,
+    .memories-lightbox-delete-btn {
         padding: 4px 8px;
         font-size: 11px;
     }
 
-    .lightbox-slideshow-container {
+    .memories-lightbox-slideshow-container {
         flex-direction: column;
         gap: 2px;
     }
 
-    .lightbox-interval-input {
+    .memories-lightbox-interval-input {
         width: 40px;
         padding: 4px;
         font-size: 11px;
     }
 }
 
-/* Улучшаем доступность для сенсорных устройств */
 @media (hover: none) and (pointer: coarse) {
-    .lightbox-nav {
+    .memories-lightbox-nav {
         width: 50px;
         height: 50px;
         background: rgba(0, 0, 0, 0.7);
     }
 
-    .lightbox-random-btn,
-    .lightbox-slideshow-btn,
-    .lightbox-delete-btn,
-    .lightbox-close-btn {
-        min-height: 44px; /* Минимальный размер для сенсорных целей */
+    .memories-lightbox-random-btn,
+    .memories-lightbox-slideshow-btn,
+    .memories-lightbox-delete-btn,
+    .memories-lightbox-close-btn {
+        min-height: 44px;
     }
 
-    .lightbox-thumb {
+    .memories-lightbox-thumb {
         min-width: 44px;
         min-height: 44px;
     }
-}
-
-/* Скрываем некоторые элементы на очень маленьких экранах */
-@media (max-width: 360px) {
-    .lightbox-slideshow-container .lightbox-interval-input {
-        display: none;
-    }
     
-    .lightbox-slideshow-btn {
-        padding: 4px 6px;
-        font-size: 10px;
-    }
-    
-    .lightbox-random-btn {
-        padding: 4px 6px;
-        font-size: 10px;
-    }
-}
-
-
-/* отключаем перетаскивание мышкой для мобильных устройств */
-@media (hover: none) and (pointer: coarse) {
-    .lightbox-thumbnails {
+    .memories-lightbox-thumbnails {
         cursor: default;
     }
     
-    .lightbox-thumbnails.dragging {
+    .memories-lightbox-thumbnails.dragging {
         cursor: default;
     }
     
-    /* На мобильных увеличиваем область прокрутки */
-    .lightbox-thumbnails {
+    .memories-lightbox-thumbnails {
         padding: 15px 12px;
     }
 }
 
-/* Дополнительные стили для лучшего внешнего вида */
-.media-gallery-container {
-    width: 100%;
-    padding: 15px;
+@media (max-width: 360px) {
+    .memories-lightbox-slideshow-container .memories-lightbox-interval-input {
+        display: none;
+    }
+    
+    .memories-lightbox-slideshow-btn {
+        padding: 4px 6px;
+        font-size: 10px;
+    }
+    
+    .memories-lightbox-random-btn {
+        padding: 4px 6px;
+        font-size: 10px;
+    }
 }
