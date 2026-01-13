@@ -1,6 +1,6 @@
 <div align="center">
 	<img src="./assets/logo.png" width="300px">
-	<h1> Obsidian Memories</h1>
+	<h1>Memories</h1>
 	<a href="https://github.com/DIMFLIX/obsidian-memories/issues">
 		<img src="https://img.shields.io/github/issues/DIMFLIX/obsidian-memories?color=ffb29b&labelColor=1C2325&style=for-the-badge">
 	</a>
@@ -23,7 +23,7 @@
 <br>
 
 
-**Obsidian Memories** is a powerful plugin for Obsidian that transforms your media files into beautiful interactive galleries right inside your notes. View images, videos, and audio with support for fullscreen mode, slideshows, and advanced navigation features.
+**Memories** is a powerful plugin for Obsidian that transforms your media files into beautiful interactive galleries right inside your notes. View images, videos, and audio with support for fullscreen mode, slideshows, and advanced navigation features.
 
 
 ## ✨ Features

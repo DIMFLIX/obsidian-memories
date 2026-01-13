@@ -1,6 +1,6 @@
 <div align="center">
 	<img src="./assets/logo.png" width="300px">
-	<h1> Obsidian Memories</h1>
+	<h1>Memories</h1>
 	<a href="https://github.com/DIMFLIX/obsidian-memories/issues">
 		<img src="https://img.shields.io/github/issues/DIMFLIX/obsidian-memories?color=ffb29b&labelColor=1C2325&style=for-the-badge">
 	</a>
@@ -23,7 +23,7 @@
 <br>
 
 
-**Obsidian Memories** — мощный плагин для Obsidian, который превращает ваши медиафайлы в красивые интерактивные галереи прямо внутри заметок. Просматривайте изображения, видео и аудио с поддержкой полноэкранного режима, слайдшоу и продвинутых функций навигации.
+**Memories** — мощный плагин для Obsidian, который превращает ваши медиафайлы в красивые интерактивные галереи прямо внутри заметок. Просматривайте изображения, видео и аудио с поддержкой полноэкранного режима, слайдшоу и продвинутых функций навигации.
 
 
 ## ✨ Возможности

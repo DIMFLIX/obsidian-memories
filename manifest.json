@@ -3,7 +3,7 @@
 	"name": "Memories",
 	"version": "1.3.0",
 	"minAppVersion": "0.15.0",
-	"description": "Plugin to display a gallery directly in a note.",
+	"description": "Display media galleries with images, videos, and audio directly in notes",
 	"author": "DIMFLIX",
 	"authorUrl": "https://github.com/DIMFLIX",
 	"fundingUrl": "https://dimflix.github.io",
