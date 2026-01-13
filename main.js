@@ -1,4 +1,33 @@
-const { Plugin } = require('obsidian');
+const { Plugin, Notice, AbstractInputSuggest } = require('obsidian');
+
+class FolderSuggest extends AbstractInputSuggest {
+    constructor(app, inputEl) {
+        super(app, inputEl);
+    }
+
+    getSuggestions(query) {
+        const folders = [];
+        const allFolders = this.app.vault.getAllLoadedFiles()
+            .filter(f => f.children !== undefined);
+        
+        for (const folder of allFolders) {
+            if (folder.path.toLowerCase().includes(query.toLowerCase())) {
+                folders.push(folder);
+            }
+        }
+        return folders;
+    }
+
+    renderSuggestion(folder, el) {
+        el.createEl('div', { text: folder.path });
+    }
+
+    selectSuggestion(folder, evt) {
+        this.inputEl.value = folder.path;
+        this.inputEl.trigger('input');
+        this.close();
+    }
+}
 
 class LRUCache {
     constructor(maxSize = 100) {
@@ -50,7 +79,7 @@ class MediaGalleryPlugin extends Plugin {
                 console.error('Media Gallery Error:', error);
                 el.createEl('div', {
                     text: 'Error loading gallery',
-                    cls: 'gallery-error'
+                    cls: 'memories-gallery-error'
                 });
             }
         });
@@ -66,7 +95,7 @@ class MediaGalleryPlugin extends Plugin {
             enableLazyLoad: true,
             gridSize: 200,
             displayType: 'full',
-            limit: 50, // значение по умолчанию для full
+            limit: 50,
             batchSize: 10,
             preloadCount: 3
         };
@@ -97,7 +126,6 @@ class MediaGalleryPlugin extends Plugin {
             config.paths = ['./'];
         }
         
-        // Устанавливаем limit: 9 по умолчанию для compact, если limit не указан явно
         if (config.displayType === 'compact' && !lines.some(line => line.trim().startsWith('limit:'))) {
             config.limit = 9;
         }
@@ -262,12 +290,11 @@ class MediaGalleryPlugin extends Plugin {
         el.empty();
         el.ctx = ctx;
         
-        // Очищаем кэш миниатюр при создании новой галереи
         this.thumbnailCache.clear();
         this.pendingRequests.clear();
 
         const loadingIndicator = el.createEl('div', { 
-            cls: 'gallery-loading',
+            cls: 'memories-gallery-loading',
             text: 'Loading gallery...' 
         });
         
@@ -281,7 +308,7 @@ class MediaGalleryPlugin extends Plugin {
                 loadingIndicator.remove();
                 el.createEl('div', {
                     text: 'No media files found',
-                    cls: 'gallery-empty'
+                    cls: 'memories-gallery-empty'
                 });
                 return;
             }
@@ -296,7 +323,7 @@ class MediaGalleryPlugin extends Plugin {
                 loadingIndicator.remove();
                 el.createEl('div', {
                     text: `Error: ${error.message}`,
-                    cls: 'gallery-error'
+                    cls: 'memories-gallery-error'
                 });
             }
         }
@@ -326,65 +353,57 @@ class MediaGalleryPlugin extends Plugin {
     }
 
     async renderGallery(el, files, config, signal) {
-        const galleryContainer = el.createEl('div', { cls: 'media-gallery-container' });
+        const galleryContainer = el.createEl('div', { cls: 'memories-media-gallery-container' });
         galleryContainer.ctx = el.ctx;
         galleryContainer._config = config;
 
-        const infoBar = galleryContainer.createEl('div', { cls: 'gallery-info-bar' });
+        const infoBar = galleryContainer.createEl('div', { cls: 'memories-gallery-info-bar' });
         
-        // Левая часть - информация
-        const leftInfo = infoBar.createEl('div', { cls: 'gallery-info-left' });
+        const leftInfo = infoBar.createEl('div', { cls: 'memories-gallery-info-left' });
+        const rightActions = infoBar.createEl('div', { cls: 'memories-gallery-info-right' });
         
-        // Правая часть - кнопка
-        const rightActions = infoBar.createEl('div', { cls: 'gallery-info-right' });
-        
-        // Вычисляем общий размер всех файлов
         const totalBytes = files.reduce((sum, file) => sum + file.stat.size, 0);
         const totalSize = this.formatFileSize(totalBytes);
         
-        // Создаем элементы информации
-        const totalFilesItem = leftInfo.createEl('div', { cls: 'info-item' });
+        const totalFilesItem = leftInfo.createEl('div', { cls: 'memories-info-item' });
         totalFilesItem.createEl('span', { 
-            cls: 'info-icon',
+            cls: 'memories-info-icon',
             text: '🖼️' 
         });
         totalFilesItem.createEl('span', { 
-            cls: 'info-text',
+            cls: 'memories-info-text',
             text: `${files.length} files` 
         });
         
-        const totalSizeItem = leftInfo.createEl('div', { cls: 'info-item' });
+        const totalSizeItem = leftInfo.createEl('div', { cls: 'memories-info-item' });
         totalSizeItem.createEl('span', { 
-            cls: 'info-icon',
+            cls: 'memories-info-icon',
             text: '💾' 
         });
         totalSizeItem.createEl('span', { 
-            cls: 'info-text',
+            cls: 'memories-info-text',
             text: totalSize 
         });
         
-        // Если компактный режим, показываем дополнительную информацию
         if (config.displayType === 'compact') {
-            const showingItem = leftInfo.createEl('div', { cls: 'info-item' });
+            const showingItem = leftInfo.createEl('div', { cls: 'memories-info-item' });
             showingItem.createEl('span', { 
-                cls: 'info-icon',
+                cls: 'memories-info-icon',
                 text: '👁️' 
             });
             showingItem.createEl('span', { 
-                cls: 'info-text',
+                cls: 'memories-info-text',
                 text: `Showing ${Math.min(files.length, config.limit)}` 
             });
         }
         
-        // Кнопку загрузки помещаем справа
         this.createUploadButton(rightActions, config, files, galleryContainer);
         
         const grid = galleryContainer.createEl('div', { 
-            cls: 'media-gallery-grid',
+            cls: 'memories-media-gallery-grid',
             attr: { style: `grid-template-columns: repeat(auto-fill, minmax(${config.gridSize}px, 1fr));` }
         });
         
-        // Файлы для отображения в галерее (с лимитом)
         const filesToDisplay = config.displayType === 'compact' ? 
             files.slice(0, config.limit) : 
             files;
@@ -402,7 +421,7 @@ class MediaGalleryPlugin extends Plugin {
             if (signal.aborted) return;
             
             const file = files[i];
-            const item = container.createEl('div', { cls: 'gallery-item' });
+            const item = container.createEl('div', { cls: 'memories-gallery-item' });
             
             if (config.enableLazyLoad) {
                 item.dataset.file = JSON.stringify({
@@ -412,12 +431,12 @@ class MediaGalleryPlugin extends Plugin {
                 });
                 item.classList.add('lazy-load');
                 
-                const placeholder = item.createEl('div', { cls: 'gallery-placeholder' });
+                const placeholder = item.createEl('div', { cls: 'memories-gallery-placeholder' });
                 placeholder.createEl('span', { text: this.getFileTypeIcon(file.name) });
                 
                 this.intersectionObserver.observe(item);
             } else {
-                const grid = container.closest('.media-gallery-grid');
+                const grid = container.closest('.memories-media-gallery-grid');
                 let allMediaFiles = [file];
                 if (grid && grid.dataset.allFiles) {
                     allMediaFiles = JSON.parse(grid.dataset.allFiles).map(fileInfo => 
@@ -455,7 +474,7 @@ class MediaGalleryPlugin extends Plugin {
             file = this.app.vault.getAbstractFileByPath(fileData.path);
             index = fileData.index;
             
-            const grid = element.closest('.media-gallery-grid');
+            const grid = element.closest('.memories-media-gallery-grid');
             if (grid && grid.dataset.allFiles) {
                 allMediaFiles = JSON.parse(grid.dataset.allFiles).map(fileInfo => 
                     this.app.vault.getAbstractFileByPath(fileInfo.path)
@@ -477,7 +496,7 @@ class MediaGalleryPlugin extends Plugin {
         this.pendingRequests.set(requestKey, true);
         
         try {
-            element.innerHTML = '';
+            element.empty();
             element.classList.remove('lazy-load');
             
             const resourcePath = this.app.vault.getResourcePath(file);
@@ -507,9 +526,8 @@ class MediaGalleryPlugin extends Plugin {
         });
         
         requestIdleCallback(() => {
-            const mediaElement = img;
-            mediaElement.addEventListener('click', () => {
-                const galleryContainer = element.closest('.media-gallery-container');
+            this.registerDomEvent(img, 'click', () => {
+                const galleryContainer = element.closest('.memories-media-gallery-container');
                 openMediaLightbox(this.app, allMediaFiles || [file], index || 0, () => {
                     this.refreshCurrentGallery(galleryContainer);
                 }, galleryContainer);
@@ -518,13 +536,13 @@ class MediaGalleryPlugin extends Plugin {
     }
 
     async loadVideoElement(element, file, resourcePath, allMediaFiles, index) {
-        const container = element.createEl('div', { cls: 'video-thumbnail-container' });
+        const container = element.createEl('div', { cls: 'memories-video-thumbnail-container' });
         
         try {
             const thumbnail = await this.getVideoThumbnailWorker(file, resourcePath);
             
             if (thumbnail) {
-                const img = container.createEl('img', {
+                container.createEl('img', {
                     attr: {
                         src: thumbnail,
                         alt: file.name,
@@ -532,7 +550,7 @@ class MediaGalleryPlugin extends Plugin {
                     }
                 });
             } else {
-                const video = container.createEl('video', {
+                container.createEl('video', {
                     attr: {
                         src: resourcePath,
                         muted: true,
@@ -541,7 +559,7 @@ class MediaGalleryPlugin extends Plugin {
                 });
             }
         } catch (error) {
-            const video = container.createEl('video', {
+            container.createEl('video', {
                 attr: {
                     src: resourcePath,
                     muted: true,
@@ -550,12 +568,12 @@ class MediaGalleryPlugin extends Plugin {
             });
         }
         
-        const playIcon = container.createEl('div', { cls: 'video-play-icon' });
-        playIcon.innerHTML = '▶';
+        const playIcon = container.createEl('div', { cls: 'memories-video-play-icon' });
+        playIcon.setText('▶');
         
         requestIdleCallback(() => {
-            element.addEventListener('click', () => {
-                const galleryContainer = element.closest('.media-gallery-container');
+            this.registerDomEvent(element, 'click', () => {
+                const galleryContainer = element.closest('.memories-media-gallery-container');
                 openMediaLightbox(this.app, allMediaFiles || [file], index || 0, () => {
                     this.refreshCurrentGallery(galleryContainer);
                 }, galleryContainer);
@@ -564,16 +582,16 @@ class MediaGalleryPlugin extends Plugin {
     }
 
     loadAudioElement(element, file, allMediaFiles, index) {
-        const container = element.createEl('div', { cls: 'audio-thumbnail-container' });
-        const icon = container.createEl('div', { cls: 'audio-icon' });
-        icon.innerHTML = '🎵';
+        const container = element.createEl('div', { cls: 'memories-audio-thumbnail-container' });
+        const icon = container.createEl('div', { cls: 'memories-audio-icon' });
+        icon.setText('🎵');
         
-        const fileName = container.createEl('div', { cls: 'audio-filename' });
+        const fileName = container.createEl('div', { cls: 'memories-audio-filename' });
         fileName.textContent = file.name;
         
         requestIdleCallback(() => {
-            container.addEventListener('click', () => {
-                const galleryContainer = element.closest('.media-gallery-container');
+            this.registerDomEvent(container, 'click', () => {
+                const galleryContainer = element.closest('.memories-media-gallery-container');
                 openMediaLightbox(this.app, allMediaFiles || [file], index || 0, () => {
                     this.refreshCurrentGallery(galleryContainer);
                 }, galleryContainer);
@@ -590,37 +608,32 @@ class MediaGalleryPlugin extends Plugin {
             const ctx = galleryContainer.ctx;
             
             if (parentEl && config && ctx) {
-                // Добавляем индикатор обновления
-                galleryContainer.classList.add('gallery-refreshing');
+                galleryContainer.classList.add('memories-gallery-refreshing');
                 
-                // Сохраняем позицию прокрутки
                 const scrollPos = window.scrollY;
                 
-                // Очищаем и пересоздаем галерею с новыми данными
                 parentEl.empty();
                 await this.createGallery(parentEl, config, ctx);
                 
-                // Восстанавливаем позицию прокрутки
                 window.scrollTo(0, scrollPos);
                 
-                // Убираем индикатор
-                galleryContainer.classList.remove('gallery-refreshing');
+                galleryContainer.classList.remove('memories-gallery-refreshing');
             }
         } catch (error) {
             console.error('Error refreshing gallery:', error);
             if (galleryContainer) {
-                galleryContainer.classList.remove('gallery-refreshing');
+                galleryContainer.classList.remove('memories-gallery-refreshing');
             }
         }
     }
 
     showErrorState(element, filename) {
-        element.innerHTML = '';
-        const errorDiv = element.createEl('div', { cls: 'gallery-error-state' });
+        element.empty();
+        const errorDiv = element.createEl('div', { cls: 'memories-gallery-error-state' });
         errorDiv.createEl('div', { text: '❌' });
         errorDiv.createEl('div', { 
             text: filename,
-            cls: 'gallery-error-filename'
+            cls: 'memories-gallery-error-filename'
         });
     }
 
@@ -706,34 +719,31 @@ class MediaGalleryPlugin extends Plugin {
 
     createUploadButton(container, config, files, galleryContainer) {
         const uploadBtn = container.createEl('button', {
-            text: '📤 Upload Media',
-            cls: 'gallery-upload-btn'
+            text: '📤 Upload media',
+            cls: 'memories-gallery-upload-btn'
         });
         
-        uploadBtn.addEventListener('click', () => {
+        this.registerDomEvent(uploadBtn, 'click', () => {
             this.showUploadForm(config, files, galleryContainer);
         });
     }
 
     showUploadForm(config, files, galleryContainer) {
-        // Создание модального окна для загрузки
         const overlay = document.createElement('div');
-        overlay.className = 'upload-form-overlay';
+        overlay.className = 'memories-upload-form-overlay';
         
         const form = document.createElement('div');
-        form.className = 'upload-form';
+        form.className = 'memories-upload-form';
         
-        // Заголовок
         const title = form.createEl('h3');
-        title.textContent = 'Upload Media Files';
+        title.textContent = 'Upload media files';
         
-        // Выбор пути
         const pathSection = form.createEl('div');
-        pathSection.className = 'upload-path-section';
-        pathSection.createEl('label', { text: 'Destination Folder:' });
+        pathSection.className = 'memories-upload-path-section';
+        pathSection.createEl('label', { text: 'Destination folder:' });
         
         const pathSelect = pathSection.createEl('select');
-        pathSelect.className = 'upload-path-select';
+        pathSelect.className = 'memories-upload-path-select';
         
         config.paths.forEach(path => {
             const option = pathSelect.createEl('option');
@@ -741,30 +751,26 @@ class MediaGalleryPlugin extends Plugin {
             option.textContent = path;
         });
         
-        // Область для загрузки
         const dropArea = form.createEl('div');
-        dropArea.className = 'upload-drop-area';
-        dropArea.innerHTML = `
-            <div class="drop-area-content">
-                <div class="drop-icon">📁</div>
-                <p>Drag and drop files here or click to browse</p>
-                <p class="drop-hint">Supports: Images, Videos, Audio</p>
-                <p class="drop-hint">Or press Ctrl+V to paste from clipboard</p>
-            </div>
-        `;
+        dropArea.className = 'memories-upload-drop-area';
         
-        // Кнопки
+        const dropContent = dropArea.createEl('div', { cls: 'memories-drop-area-content' });
+        dropContent.createEl('div', { cls: 'memories-drop-icon', text: '📁' });
+        dropContent.createEl('p', { text: 'Drag and drop files here or click to browse' });
+        dropContent.createEl('p', { cls: 'memories-drop-hint', text: 'Supports: images, videos, audio' });
+        dropContent.createEl('p', { cls: 'memories-drop-hint', text: 'Or press Ctrl+V to paste from clipboard' });
+        
         const buttonSection = form.createEl('div');
-        buttonSection.className = 'upload-button-section';
+        buttonSection.className = 'memories-upload-button-section';
         
         const cancelBtn = buttonSection.createEl('button', {
             text: 'Cancel',
-            cls: 'upload-cancel-btn'
+            cls: 'memories-upload-cancel-btn'
         });
         
         const uploadBtn = buttonSection.createEl('button', {
-            text: 'Upload Files',
-            cls: 'upload-confirm-btn'
+            text: 'Upload files',
+            cls: 'memories-upload-confirm-btn'
         });
         uploadBtn.disabled = true;
         
@@ -774,15 +780,13 @@ class MediaGalleryPlugin extends Plugin {
         overlay.appendChild(form);
         document.body.appendChild(overlay);
         
-        // Обработчики событий
         this.setupUploadHandlers(form, dropArea, pathSelect, uploadBtn, cancelBtn, overlay, config, galleryContainer);
     }
 
     setupUploadHandlers(form, dropArea, pathSelect, uploadBtn, cancelBtn, overlay, config, galleryContainer) {
         let selectedFiles = [];
         
-        // Обработчик выбора файлов через клик
-        dropArea.addEventListener('click', () => {
+        this.registerDomEvent(dropArea, 'click', () => {
             const fileInput = document.createElement('input');
             fileInput.type = 'file';
             fileInput.multiple = true;
@@ -791,39 +795,37 @@ class MediaGalleryPlugin extends Plugin {
                 const newFiles = Array.from(e.target.files);
                 selectedFiles = [...selectedFiles, ...newFiles];
                 this.updateDropArea(dropArea, selectedFiles);
-                this.updateFileList(form, selectedFiles); // Обновляем список файлов
+                this.updateFileList(form, selectedFiles);
                 uploadBtn.disabled = selectedFiles.length === 0;
             });
             fileInput.click();
         });
         
-        // Обработчик drag and drop
-        dropArea.addEventListener('dragover', (e) => {
+        this.registerDomEvent(dropArea, 'dragover', (e) => {
             e.preventDefault();
             dropArea.classList.add('dragover');
         });
         
-        dropArea.addEventListener('dragleave', () => {
+        this.registerDomEvent(dropArea, 'dragleave', () => {
             dropArea.classList.remove('dragover');
         });
         
-        dropArea.addEventListener('drop', (e) => {
+        this.registerDomEvent(dropArea, 'drop', (e) => {
             e.preventDefault();
             dropArea.classList.remove('dragover');
             const newFiles = Array.from(e.dataTransfer.files);
             selectedFiles = [...selectedFiles, ...newFiles];
             this.updateDropArea(dropArea, selectedFiles);
-            this.updateFileList(form, selectedFiles); // Обновляем список файлов
+            this.updateFileList(form, selectedFiles);
             uploadBtn.disabled = selectedFiles.length === 0;
         });
         
-        // Обработчик вставки (Ctrl+V)
         const pasteHandler = (e) => {
             if (e.clipboardData && e.clipboardData.files.length > 0) {
                 const newFiles = Array.from(e.clipboardData.files);
                 selectedFiles = [...selectedFiles, ...newFiles];
                 this.updateDropArea(dropArea, selectedFiles);
-                this.updateFileList(form, selectedFiles); // Обновляем список файлов
+                this.updateFileList(form, selectedFiles);
                 uploadBtn.disabled = selectedFiles.length === 0;
                 e.preventDefault();
             }
@@ -831,14 +833,12 @@ class MediaGalleryPlugin extends Plugin {
         
         document.addEventListener('paste', pasteHandler);
         
-        // Кнопка отмены
-        cancelBtn.addEventListener('click', () => {
+        this.registerDomEvent(cancelBtn, 'click', () => {
             document.removeEventListener('paste', pasteHandler);
             overlay.remove();
         });
         
-        // Кнопка загрузки
-        uploadBtn.addEventListener('click', async () => {
+        this.registerDomEvent(uploadBtn, 'click', async () => {
             if (selectedFiles.length > 0) {
                 await this.handleFileUpload(selectedFiles, pathSelect.value, config, galleryContainer);
                 document.removeEventListener('paste', pasteHandler);
@@ -846,69 +846,56 @@ class MediaGalleryPlugin extends Plugin {
             }
         });
         
-        // Закрытие по клику вне формы
-        overlay.addEventListener('click', (e) => {
+        this.registerDomEvent(overlay, 'click', (e) => {
             if (e.target === overlay) {
                 document.removeEventListener('paste', pasteHandler);
                 overlay.remove();
             }
         });
 
-        // Инициализируем список файлов при открытии формы
         this.updateFileList(form, selectedFiles);
     }
 
     updateDropArea(dropArea, files) {
-        dropArea.innerHTML = '';
+        dropArea.empty();
         
         const content = dropArea.createEl('div');
-        content.className = 'drop-area-content';
+        content.className = 'memories-drop-area-content';
         
         if (files.length > 0) {
-            const icon = content.createEl('div');
-            icon.className = 'drop-icon';
-            icon.textContent = '✅';
-            
-            const text = content.createEl('p');
-            text.textContent = `${files.length} file(s) selected`;
-            
-            const hint = content.createEl('p');
-            hint.className = 'drop-hint';
-            hint.textContent = 'Click to select more files or drag and drop additional files';
-            
+            content.createEl('div', { cls: 'memories-drop-icon', text: '✅' });
+            content.createEl('p', { text: `${files.length} file(s) selected` });
+            content.createEl('p', { 
+                cls: 'memories-drop-hint',
+                text: 'Click to select more files or drag and drop additional files'
+            });
         } else {
-            const icon = content.createEl('div');
-            icon.className = 'drop-icon';
-            icon.textContent = '📁';
-            
-            const text = content.createEl('p');
-            text.textContent = 'Drag and drop files here or click to browse';
-            
-            const hint = content.createEl('p');
-            hint.className = 'drop-hint';
-            hint.textContent = 'Supports: Images, Videos, Audio';
-            
-            const hint2 = content.createEl('p');
-            hint2.className = 'drop-hint';
-            hint2.textContent = 'Or press Ctrl+V to paste from clipboard';
+            content.createEl('div', { cls: 'memories-drop-icon', text: '📁' });
+            content.createEl('p', { text: 'Drag and drop files here or click to browse' });
+            content.createEl('p', { 
+                cls: 'memories-drop-hint',
+                text: 'Supports: Images, Videos, Audio'
+            });
+            content.createEl('p', { 
+                cls: 'memories-drop-hint',
+                text: 'Or press Ctrl+V to paste from clipboard'
+            });
         }
         
         if (files.length > 0) {
             dropArea.classList.add('has-files');
             
-            // Создаем контейнер для списка файлов ПОД областью загрузки
-            const fileListContainer = dropArea.parentElement.querySelector('.upload-file-list-container');
+            const fileListContainer = dropArea.parentElement.querySelector('.memories-upload-file-list-container');
             if (!fileListContainer) {
                 const newFileListContainer = document.createElement('div');
-                newFileListContainer.className = 'upload-file-list-container';
+                newFileListContainer.className = 'memories-upload-file-list-container';
                 dropArea.parentElement.insertBefore(newFileListContainer, dropArea.nextSibling);
             }
             
             this.updateFileList(dropArea.parentElement, files);
         } else {
             dropArea.classList.remove('has-files');
-            // Удаляем контейнер списка файлов, если нет файлов
-            const fileListContainer = dropArea.parentElement.querySelector('.upload-file-list-container');
+            const fileListContainer = dropArea.parentElement.querySelector('.memories-upload-file-list-container');
             if (fileListContainer) {
                 fileListContainer.remove();
             }
@@ -916,46 +903,46 @@ class MediaGalleryPlugin extends Plugin {
     }
 
     updateFileList(container, files) {
-        let fileListContainer = container.querySelector('.upload-file-list-container');
+        let fileListContainer = container.querySelector('.memories-upload-file-list-container');
         if (!fileListContainer) {
             fileListContainer = document.createElement('div');
-            fileListContainer.className = 'upload-file-list-container';
-            const dropArea = container.querySelector('.upload-drop-area');
+            fileListContainer.className = 'memories-upload-file-list-container';
+            const dropArea = container.querySelector('.memories-upload-drop-area');
             container.insertBefore(fileListContainer, dropArea.nextSibling);
         }
         
         fileListContainer.innerHTML = '';
         
         const title = fileListContainer.createEl('div');
-        title.className = 'upload-file-list-title';
-        title.textContent = 'Selected Files:';
+        title.className = 'memories-upload-file-list-title';
+        title.textContent = 'Selected files:';
         
         const fileList = fileListContainer.createEl('div');
-        fileList.className = 'upload-file-list';
+        fileList.className = 'memories-upload-file-list';
         
         files.forEach((file, index) => {
             const fileItem = fileList.createEl('div');
-            fileItem.className = 'upload-file-item';
+            fileItem.className = 'memories-upload-file-item';
             
             const fileIcon = fileItem.createEl('span');
-            fileIcon.className = 'upload-file-icon';
+            fileIcon.className = 'memories-upload-file-icon';
             fileIcon.textContent = this.getFileTypeIcon(file.name);
             
             const fileName = fileItem.createEl('span');
             fileName.textContent = file.name;
-            fileName.className = 'upload-file-name';
+            fileName.className = 'memories-upload-file-name';
             
             const fileSize = fileItem.createEl('span');
-            fileSize.className = 'upload-file-size';
+            fileSize.className = 'memories-upload-file-size';
             fileSize.textContent = this.formatFileSize(file.size);
             
             const removeBtn = fileItem.createEl('button');
             removeBtn.textContent = '✕';
-            removeBtn.className = 'upload-remove-file';
-            removeBtn.addEventListener('click', (e) => {
+            removeBtn.className = 'memories-upload-remove-file';
+            this.registerDomEvent(removeBtn, 'click', (e) => {
                 e.stopPropagation();
                 files.splice(index, 1);
-                this.updateDropArea(container.querySelector('.upload-drop-area'), files);
+                this.updateDropArea(container.querySelector('.memories-upload-drop-area'), files);
             });
         });
     }
@@ -969,9 +956,8 @@ class MediaGalleryPlugin extends Plugin {
         let size = parseFloat((bytes / Math.pow(k, i)).toFixed(2));
         let unit = sizes[i];
         
-        // Для больших размеров оставляем только целые числа
         if (unit === 'GB' || unit === 'TB') {
-            size = Math.round(size * 10) / 10; // Округляем до одного знака после запятой
+            size = Math.round(size * 10) / 10;
         }
         
         return `${size} ${unit}`;
@@ -979,7 +965,7 @@ class MediaGalleryPlugin extends Plugin {
 
     async handleFileUpload(files, targetPath, config, galleryContainer) {
         const loadingIndicator = galleryContainer.createEl('div', {
-            cls: 'upload-loading',
+            cls: 'memories-upload-loading',
             text: `Uploading ${files.length} file(s)...`
         });
         
@@ -989,14 +975,12 @@ class MediaGalleryPlugin extends Plugin {
             }
             
             loadingIndicator.remove();
-            
-            // Обновляем галерею
             await this.refreshGallery(galleryContainer, config);
             
         } catch (error) {
             loadingIndicator.remove();
             console.error('Upload error:', error);
-            // Показать ошибку
+            new Notice('Error uploading files: ' + error.message);
         }
     }
 
@@ -1015,7 +999,6 @@ class MediaGalleryPlugin extends Plugin {
         let newName = fileName;
         let counter = 1;
         
-        // Проверяем существование файла и добавляем суффикс если нужно
         while (this.app.vault.getAbstractFileByPath(`${folderPath}/${newName}`)) {
             newName = `${baseName}_${counter}.${fileExtension}`;
             counter++;
@@ -1038,7 +1021,7 @@ class MediaGalleryPlugin extends Plugin {
         const lightboxStyles = document.getElementById('media-lightbox-styles');
         if (lightboxStyles) lightboxStyles.remove();
         
-        const lightbox = document.getElementById('media-lightbox-overlay');
+        const lightbox = document.getElementById('memories-lightbox-overlay');
         if (lightbox) lightbox.remove();
         
         if (this.intersectionObserver) {
@@ -1061,26 +1044,21 @@ function deleteCurrentFile(state) {
     
     if (confirm(`Are you sure you want to delete "${currentFile.name}"?`)) {
         try {
-            // Удаляем файл из хранилища Obsidian
-            state.app.vault.delete(currentFile);
+            state.app.fileManager.trashFile(currentFile);
             
-            // Удаляем файл из списка
             state.mediaFiles.splice(state.currentIndex, 1);
             
             if (state.mediaFiles.length === 0) {
                 closeLightbox(state);
                 new Notice('File deleted. Gallery is now empty.');
             } else {
-                // Переходим к следующему или предыдущему файлу
                 state.currentIndex = Math.min(state.currentIndex, state.mediaFiles.length - 1);
                 updateMedia(state, state.fileLink, state.fileMeta);
                 updateThumbnails(state);
                 new Notice('File deleted successfully.');
             }
             
-            // ВСЕГДА обновляем родительскую галерею после удаления
             if (state.galleryContainer && state.onFileDeleted) {
-                // Добавляем небольшую задержку для гарантии обновления
                 setTimeout(() => {
                     state.onFileDeleted();
                 }, 100);
@@ -1094,7 +1072,7 @@ function deleteCurrentFile(state) {
 }
 
 function updateThumbnails(state) {
-    const thumbContainer = document.getElementById('lightbox-thumbnails');
+    const thumbContainer = document.getElementById('memories-lightbox-thumbnails');
     if (!thumbContainer) return;
     
     thumbContainer.innerHTML = '';
@@ -1102,7 +1080,7 @@ function updateThumbnails(state) {
     for (let i = 0; i < state.mediaFiles.length; i++) {
         const file = state.mediaFiles[i];
         const thumb = document.createElement('div');
-        thumb.className = 'lightbox-thumb';
+        thumb.className = 'memories-lightbox-thumb';
         thumb.dataset.index = i;
         
         const resourcePath = state.app.vault.getResourcePath(file);
@@ -1120,7 +1098,7 @@ function updateThumbnails(state) {
             thumb.appendChild(video);
         } else if (isAudio(file.name)) {
             const audioThumb = document.createElement('div');
-            audioThumb.className = 'audio-thumb';
+            audioThumb.className = 'memories-audio-thumb';
             audioThumb.textContent = '🎵';
             thumb.appendChild(audioThumb);
         }
@@ -1137,7 +1115,7 @@ function updateThumbnails(state) {
 }
 
 function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryContainer) {
-    const existing = document.getElementById('media-lightbox-overlay');
+    const existing = document.getElementById('memories-lightbox-overlay');
     if (existing) existing.remove();
 
     const state = {
@@ -1152,33 +1130,33 @@ function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryCo
     };
 
     const overlay = document.createElement('div');
-    overlay.id = 'media-lightbox-overlay';
+    overlay.id = 'memories-lightbox-overlay';
 
     const topBar = document.createElement('div');
-    topBar.className = 'lightbox-topbar';
+    topBar.className = 'memories-lightbox-topbar';
 
     const leftControls = document.createElement('div');
-    leftControls.className = 'lightbox-controls-left';
+    leftControls.className = 'memories-lightbox-controls-left';
 
     const randomBtn = document.createElement('button');
-    randomBtn.className = 'lightbox-random-btn';
-    randomBtn.textContent = '🎲 Random';
+    randomBtn.className = 'memories-lightbox-random-btn';
+    randomBtn.textContent = '🎲 Random shuffle';
     randomBtn.addEventListener('click', () => toggleRandom(state, randomBtn));
 
     const slideshowContainer = document.createElement('div');
-    slideshowContainer.className = 'lightbox-slideshow-container';
+    slideshowContainer.className = 'memories-lightbox-slideshow-container';
 
     const intervalInput = document.createElement('input');
     intervalInput.type = 'number';
-    intervalInput.className = 'lightbox-interval-input';
+    intervalInput.className = 'memories-lightbox-interval-input';
     intervalInput.value = '3';
     intervalInput.min = '1';
     intervalInput.max = '60';
     intervalInput.placeholder = 'sec';
 
     const slideshowBtn = document.createElement('button');
-    slideshowBtn.className = 'lightbox-slideshow-btn';
-    slideshowBtn.textContent = '▶ Slideshow';
+    slideshowBtn.className = 'memories-lightbox-slideshow-btn';
+    slideshowBtn.textContent = '▶ Start slideshow';
     slideshowBtn.addEventListener('click', () => toggleSlideshow(state, slideshowBtn, intervalInput));
 
     slideshowContainer.appendChild(intervalInput);
@@ -1188,18 +1166,18 @@ function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryCo
     leftControls.appendChild(slideshowContainer);
 
     const rightControls = document.createElement('div');
-    rightControls.className = 'lightbox-controls-right';
+    rightControls.className = 'memories-lightbox-controls-right';
 
     const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'lightbox-delete-btn';
-    deleteBtn.textContent = '🗑️ Delete';
+    deleteBtn.className = 'memories-lightbox-delete-btn';
+    deleteBtn.textContent = '🗑️ Delete file';
     deleteBtn.addEventListener('click', () => deleteCurrentFile(state));
 
     const fileInfo = document.createElement('div');
-    fileInfo.className = 'lightbox-file-info';
+    fileInfo.className = 'memories-lightbox-file-info';
     
     const fileLink = document.createElement('a');
-    fileLink.className = 'lightbox-file-link';
+    fileLink.className = 'memories-lightbox-file-link';
     fileLink.textContent = mediaFiles[startIndex].name;
     fileLink.href = '#';
     fileLink.addEventListener('click', (e) => {
@@ -1208,18 +1186,18 @@ function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryCo
     });
 
     const fileMeta = document.createElement('div');
-    fileMeta.className = 'lightbox-file-meta';
+    fileMeta.className = 'memories-lightbox-file-meta';
     updateFileMeta(fileMeta, mediaFiles[startIndex]);
 
     fileInfo.appendChild(fileMeta);
     fileInfo.appendChild(fileLink);
     
     const infoDiv = document.createElement('div');
-    infoDiv.className = 'lightbox-close-box';
+    infoDiv.className = 'memories-lightbox-close-box';
     infoDiv.addEventListener('click', () => closeLightbox(state));
 
     const closeBtn = document.createElement('button');
-    closeBtn.className = 'lightbox-close-btn';
+    closeBtn.className = 'memories-lightbox-close-btn';
     closeBtn.textContent = '✕';
     closeBtn.addEventListener('click', () => closeLightbox(state));
 
@@ -1232,21 +1210,21 @@ function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryCo
     topBar.appendChild(rightControls);
 
     const mainArea = document.createElement('div');
-    mainArea.className = 'lightbox-main';
+    mainArea.className = 'memories-lightbox-main';
 
     const mediaContainer = document.createElement('div');
-    mediaContainer.className = 'lightbox-media-container';
-    mediaContainer.id = 'lightbox-media-container';
+    mediaContainer.className = 'memories-lightbox-media-container';
+    mediaContainer.id = 'memories-lightbox-media-container';
 
     const prevBtn = document.createElement('button');
-    prevBtn.className = 'lightbox-nav lightbox-prev';
+    prevBtn.className = 'memories-lightbox-nav memories-lightbox-prev';
     const prevArrow = document.createElement('span');
     prevArrow.textContent = '‹';
     prevBtn.appendChild(prevArrow);
     prevBtn.addEventListener('click', () => navigate(state, -1));
 
     const nextBtn = document.createElement('button');
-    nextBtn.className = 'lightbox-nav lightbox-next';
+    nextBtn.className = 'memories-lightbox-nav memories-lightbox-next';
     const nextArrow = document.createElement('span');
     nextArrow.textContent = '›';
     nextBtn.appendChild(nextArrow);
@@ -1257,13 +1235,13 @@ function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryCo
     mainArea.appendChild(nextBtn);
 
     const thumbContainer = document.createElement('div');
-    thumbContainer.className = 'lightbox-thumbnails';
-    thumbContainer.id = 'lightbox-thumbnails';
+    thumbContainer.className = 'memories-lightbox-thumbnails';
+    thumbContainer.id = 'memories-lightbox-thumbnails';
 
     for (let i = 0; i < mediaFiles.length; i++) {
         const file = mediaFiles[i];
         const thumb = document.createElement('div');
-        thumb.className = 'lightbox-thumb';
+        thumb.className = 'memories-lightbox-thumb';
         thumb.dataset.index = i;
 
         const resourcePath = app.vault.getResourcePath(file);
@@ -1281,7 +1259,7 @@ function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryCo
             thumb.appendChild(video);
         } else if (isAudio(file.name)) {
             const audioThumb = document.createElement('div');
-            audioThumb.className = 'audio-thumb';
+            audioThumb.className = 'memories-audio-thumb';
             audioThumb.textContent = '🎵';
             thumb.appendChild(audioThumb);
         }
@@ -1296,7 +1274,6 @@ function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryCo
         thumbContainer.appendChild(thumb);
     }
 
-    // Поддержка перетаскивания мышкой
     let isDragging = false;
     let startX;
     let scrollLeft;
@@ -1322,15 +1299,14 @@ function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryCo
         if (!isDragging) return;
         e.preventDefault();
         const x = e.pageX - thumbContainer.offsetLeft;
-        const walk = (x - startX) * 2; // множитель для скорости прокрутки
+        const walk = (x - startX) * 2;
         thumbContainer.scrollLeft = scrollLeft - walk;
     });
 
     thumbContainer.addEventListener('wheel', (e) => {
         e.preventDefault();
-        thumbContainer.scrollLeft += e.deltaY * 2; // множитель для скорости прокрутки
+        thumbContainer.scrollLeft += e.deltaY * 2;
         
-        // Добавляем визуальную обратную связь
         thumbContainer.classList.add('scrolling');
         clearTimeout(thumbContainer.scrollTimeout);
         thumbContainer.scrollTimeout = setTimeout(() => {
@@ -1338,7 +1314,6 @@ function openMediaLightbox(app, mediaFiles, startIndex, onFileDeleted, galleryCo
         }, 150);
     });
     
-    // Отключаем перетаскивание при клике на миниатюру
     thumbContainer.addEventListener('click', (e) => {
         if (isDragging) {
             e.preventDefault();
@@ -1404,14 +1379,12 @@ function closeLightbox(state) {
         clearInterval(state.slideshowInterval);
     }
 
-    const overlay = document.getElementById('media-lightbox-overlay');
+    const overlay = document.getElementById('memories-lightbox-overlay');
     if (overlay) {
         overlay.dispatchEvent(new Event('cleanup'));
         overlay.remove();
     }
     
-    // Принудительно обновляем галерею при закрытии лайтбокса
-    // на случай, если были какие-то изменения
     if (state && state.galleryContainer && state.onFileDeleted) {
         setTimeout(() => {
             state.onFileDeleted();
@@ -1424,13 +1397,13 @@ function toggleSlideshow(state, slideshowBtn, intervalInput) {
         clearInterval(state.slideshowInterval);
         state.slideshowInterval = null;
         state.slideshowActive = false;
-        slideshowBtn.textContent = '▶ Slideshow';
+        slideshowBtn.textContent = '▶ Start slideshow';
         slideshowBtn.classList.remove('active');
         intervalInput.disabled = false;
     } else {
         const interval = parseInt(intervalInput.value) || 3;
         state.slideshowActive = true;
-        slideshowBtn.textContent = '⏸ Stop';
+        slideshowBtn.textContent = '⏸ Stop slideshow';
         slideshowBtn.classList.add('active');
         intervalInput.disabled = true;
 
@@ -1455,10 +1428,10 @@ function toggleRandom(state, randomBtn) {
 function updateRandomButton(state, randomBtn) {
     if (state.randomMode) {
         randomBtn.classList.add('active');
-        randomBtn.textContent = '🎲 Random (ON)';
+        randomBtn.textContent = '🎲 Random shuffle (ON)';
     } else {
         randomBtn.classList.remove('active');
-        randomBtn.textContent = '🎲 Random';
+        randomBtn.textContent = '🎲 Random shuffle';
     }
 }
 
@@ -1481,7 +1454,7 @@ function navigate(state, direction) {
 }
 
 function updateMedia(state, fileLink, fileMeta) {
-    const container = document.getElementById('lightbox-media-container');
+    const container = document.getElementById('memories-lightbox-media-container');
     if (!container) return;
 
     container.innerHTML = '';
@@ -1587,10 +1560,10 @@ function updateMedia(state, fileLink, fileMeta) {
 
     } else if (isAudio(file.name)) {
         const audioContainer = document.createElement('div');
-        audioContainer.className = 'lightbox-audio-container';
+        audioContainer.className = 'memories-lightbox-audio-container';
         
         const audioIcon = document.createElement('div');
-        audioIcon.className = 'lightbox-audio-icon';
+        audioIcon.className = 'memories-lightbox-audio-icon';
         audioIcon.textContent = '🎵';
         
         const audio = document.createElement('audio');
@@ -1599,7 +1572,7 @@ function updateMedia(state, fileLink, fileMeta) {
         audio.autoplay = true;
         
         const fileName = document.createElement('div');
-        fileName.className = 'lightbox-audio-filename';
+        fileName.className = 'memories-lightbox-audio-filename';
         fileName.textContent = file.name;
         
         audioContainer.appendChild(audioIcon);
@@ -1608,7 +1581,7 @@ function updateMedia(state, fileLink, fileMeta) {
         container.appendChild(audioContainer);
     }
 
-    const thumbs = document.querySelectorAll('.lightbox-thumb');
+    const thumbs = document.querySelectorAll('.memories-lightbox-thumb');
     thumbs.forEach((thumb, index) => {
         const thumbIndex = parseInt(thumb.dataset.index);
         if (thumbIndex === state.currentIndex) {
@@ -1635,8 +1608,6 @@ function isAudio(filename) {
     return ['mp3', 'wav', 'flac', 'ogg', 'aac', 'm4a', 'wma', 'opus', 'aiff', 'au'].includes(ext);
 }
 
-
-// Добавляем стили при загрузке плагина
 MediaGalleryPlugin.prototype.loadStyles = function() {
     if (document.getElementById('media-gallery-styles')) return;
     
