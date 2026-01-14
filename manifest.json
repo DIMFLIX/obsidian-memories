@@ -1,7 +1,7 @@
 {
 	"id": "memories",
 	"name": "Memories",
-	"version": "1.3.0",
+	"version": "1.4.0",
 	"minAppVersion": "0.15.0",
 	"description": "Display media galleries with images, videos, and audio directly in notes",
 	"author": "DIMFLIX",
