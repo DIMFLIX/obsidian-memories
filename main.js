@@ -1,34 +1,4 @@
-const { Plugin, Notice, AbstractInputSuggest, Scope, TFolder, TFile, normalizePath } = require('obsidian');
-
-class FolderSuggest extends AbstractInputSuggest {
-    constructor(app, inputEl) {
-        super(app, inputEl);
-    }
-
-    getSuggestions(query) {
-        const folders = [];
-        const allFolders = this.app.vault.getAllFolders();
-        const q = (query || '').toLowerCase();
-
-        for (const folder of allFolders) {
-            if (folder.path.toLowerCase().includes(q)) {
-                folders.push(folder);
-            }
-        }
-
-        return folders;
-    }
-
-    renderSuggestion(folder, el) {
-        el.createEl('div', { text: folder.path });
-    }
-
-    selectSuggestion(folder, evt) {
-        this.inputEl.value = folder.path;
-        this.inputEl.trigger('input');
-        this.close();
-    }
-}
+const { Plugin, Notice, Scope, TFolder, TFile, normalizePath } = require('obsidian');
 
 class LRUCache {
     constructor(maxSize = 100) {
