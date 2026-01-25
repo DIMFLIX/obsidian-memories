@@ -1,4 +1,4 @@
-const { Plugin, Notice, AbstractInputSuggest, Scope } = require('obsidian');
+const { Plugin, Notice, AbstractInputSuggest, Scope, TFolder, TFile, normalizePath } = require('obsidian');
 
 class FolderSuggest extends AbstractInputSuggest {
     constructor(app, inputEl) {
@@ -7,14 +7,15 @@ class FolderSuggest extends AbstractInputSuggest {
 
     getSuggestions(query) {
         const folders = [];
-        const allFolders = this.app.vault.getAllLoadedFiles()
-            .filter(f => f.children !== undefined);
-        
+        const allFolders = this.app.vault.getAllFolders();
+        const q = (query || '').toLowerCase();
+
         for (const folder of allFolders) {
-            if (folder.path.toLowerCase().includes(query.toLowerCase())) {
+            if (folder.path.toLowerCase().includes(q)) {
                 folders.push(folder);
             }
         }
+
         return folders;
     }
 
@@ -99,12 +100,21 @@ class MediaGalleryPlugin extends Plugin {
             batchSize: 10,
             preloadCount: 3
         };
+
+        const cleanPath = (p) => {
+            let np = normalizePath((p || '').trim());
+            if (np === '.') np = './';
+            return np;
+        };
         
         for (let line of lines) {
             line = line.trim();
             if (line.startsWith('paths:')) {
                 const pathsStr = line.substring(6).trim();
-                config.paths = pathsStr.split(',').map(p => p.trim());
+                config.paths = pathsStr
+                    .split(',')
+                    .map(cleanPath)
+                    .filter(Boolean);
             } else if (line.startsWith('sort:')) {
                 config.sortOrder = line.substring(5).trim();
             } else if (line.startsWith('lazy:')) {
@@ -118,7 +128,7 @@ class MediaGalleryPlugin extends Plugin {
             } else if (line.startsWith('batch:')) {
                 config.batchSize = parseInt(line.substring(6).trim()) || 10;
             } else if (line && !line.includes(':')) {
-                config.paths = [line];
+                config.paths = [cleanPath(line)];
             }
         }
         
@@ -342,7 +352,7 @@ class MediaGalleryPlugin extends Plugin {
                 const folder = this.app.vault.getAbstractFileByPath(folderPath);
                 if (!folder) continue;
                 
-                if (folder.children !== undefined) {
+                if (folder instanceof TFolder) {
                     const mediaFiles = this.getMediaFiles(folder);
                     allMediaFiles.push(...mediaFiles);
                 }
@@ -399,10 +409,8 @@ class MediaGalleryPlugin extends Plugin {
         
         this.createUploadButton(rightActions, config, files, galleryContainer);
         
-        const grid = galleryContainer.createEl('div', { 
-            cls: 'memories-media-gallery-grid',
-            attr: { style: `grid-template-columns: repeat(auto-fill, minmax(${config.gridSize}px, 1fr));` }
-        });
+        const grid = galleryContainer.createEl('div', { cls: 'memories-media-gallery-grid' });
+        grid.style.setProperty('--memories-grid-size', `${config.gridSize}px`);
         
         const filesToDisplay = config.displayType === 'compact' ? 
             files.slice(0, config.limit) : 
@@ -639,13 +647,14 @@ class MediaGalleryPlugin extends Plugin {
 
     getAllMediaFromRoot(folder) {
         const mediaFiles = [];
+
         const traverse = (currentFolder) => {
-            if (!currentFolder.children) return;
+            if (!(currentFolder instanceof TFolder)) return;
             
             for (const child of currentFolder.children) {
-                if (child.children !== undefined) {
+                if (child instanceof TFolder) {
                     traverse(child);
-                } else {
+                } else if (child instanceof TFile) {
                     if (this.isMediaFile(child.name)) {
                         mediaFiles.push(child);
                     }
@@ -659,9 +668,13 @@ class MediaGalleryPlugin extends Plugin {
 
     getMediaFiles(folder) {
         const mediaFiles = [];
+
+        if (!(folder instanceof TFolder)) {
+            return mediaFiles;
+        }
         
         for (const child of folder.children) {
-            if (child.children === undefined && this.isMediaFile(child.name)) {
+            if (child instanceof TFile && this.isMediaFile(child.name)) {
                 mediaFiles.push(child);
             }
         }
@@ -912,7 +925,7 @@ class MediaGalleryPlugin extends Plugin {
             container.insertBefore(fileListContainer, dropArea.nextSibling);
         }
         
-        fileListContainer.innerHTML = '';
+        fileListContainer.empty();
         
         const title = fileListContainer.createEl('div');
         title.className = 'memories-upload-file-list-title';
@@ -1071,7 +1084,7 @@ function updateThumbnails(state) {
     const thumbContainer = document.getElementById('memories-lightbox-thumbnails');
     if (!thumbContainer) return;
     
-    thumbContainer.innerHTML = '';
+    thumbContainer.empty();
     
     for (let i = 0; i < state.mediaFiles.length; i++) {
         const file = state.mediaFiles[i];
@@ -1447,7 +1460,7 @@ function updateMedia(state, fileLink, fileMeta) {
     const container = document.getElementById('memories-lightbox-media-container');
     if (!container) return;
 
-    container.innerHTML = '';
+    container.empty();
     const file = state.mediaFiles[state.currentIndex];
     const resourcePath = state.app.vault.getResourcePath(file);
 
